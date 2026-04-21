@@ -17,14 +17,17 @@ For each source user, candidate IDs are discovered in stages:
    - same `country_code`
    - same `region_code`
    - same `location_cell_l5`
+   - only runs when source has all three fields populated
 
 2. **Relaxed nearby** (if still below target limit)
    - same `country_code`
    - same `region_code`
    - same `location_cell_l4`
+   - only runs when source has country/region/L4 populated
 
 3. **Broader fallback** (if still below target limit)
    - same `country_code`
+   - only runs when source has country populated
 
 This avoids cross-comparing `location_cell_l4` with candidate `location_cell_l5` and keeps retrieval deterministic and shared-hosting friendly.
 
@@ -72,6 +75,9 @@ where:
 - `union_minutes` = `total_source_minutes + total_candidate_minutes - overlap_minutes`
 
 This is balanced for both users and avoids one-sided normalization.
+Before calculating overlap, each side's slots are normalized per weekday
+(invalid slots removed, intervals merged) so overlap/union is not inflated by
+duplicated or overlapping input rows.
 
 ## Queue updates
 - Writes to `match_candidate_queue` through upsert on `(user_id, candidate_user_id, goal_id)`.

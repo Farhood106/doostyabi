@@ -35,8 +35,10 @@ final class HardFilterService
             $reasons[] = 'age_preference_mismatch';
         }
 
-        // Mandatory geography gate for MVP safety: same country only.
-        // Region/cell are ranking signals, not hard reject signals.
+        // Privacy-safe hard gate: country must match.
+        // Region/cell are intentionally *not* hard filters so cold-start users
+        // are not over-rejected; those fields are handled in candidate staging
+        // and distance scoring.
         if (($source['country_code'] ?? '') !== ($candidate['country_code'] ?? '')) {
             $reasons[] = 'country_mismatch';
         }
@@ -59,6 +61,13 @@ final class HardFilterService
 
     private function ageCompatible(array $a, array $b): bool
     {
+        if (empty($a['birth_year']) || empty($b['birth_year'])) {
+            return false;
+        }
+        if (!isset($a['age_min_pref'], $a['age_max_pref'], $b['age_min_pref'], $b['age_max_pref'])) {
+            return false;
+        }
+
         $year = (int)date('Y');
         $ageA = $year - (int)$a['birth_year'];
         $ageB = $year - (int)$b['birth_year'];
@@ -73,14 +82,24 @@ final class HardFilterService
 
         foreach ($aBoundaries as $r) {
             $key = $r['boundary_key'] . '|' . $r['boundary_value'];
-            if ($r['importance'] === 'required') $aReq[$key] = true;
-            if ($r['importance'] === 'avoid') $aAvoid[$key] = true;
+            $importance = strtolower(trim((string)($r['importance'] ?? '')));
+            if ($importance === 'required') {
+                $aReq[$key] = true;
+            }
+            if ($importance === 'avoid') {
+                $aAvoid[$key] = true;
+            }
         }
 
         foreach ($bBoundaries as $r) {
             $key = $r['boundary_key'] . '|' . $r['boundary_value'];
-            if ($r['importance'] === 'required') $bReq[$key] = true;
-            if ($r['importance'] === 'avoid') $bAvoid[$key] = true;
+            $importance = strtolower(trim((string)($r['importance'] ?? '')));
+            if ($importance === 'required') {
+                $bReq[$key] = true;
+            }
+            if ($importance === 'avoid') {
+                $bAvoid[$key] = true;
+            }
         }
 
         // Required vs avoid conflicts both directions

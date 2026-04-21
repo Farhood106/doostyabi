@@ -72,30 +72,37 @@ final class CandidateGenerationService
     {
         $ids = [];
 
-        $strict = $this->repo->strictNearbyL5(
-            (int)$source['user_id'],
-            (string)$source['country_code'],
-            (string)$source['region_code'],
-            (string)$source['location_cell_l5'],
-            $limit
-        );
-        foreach ($strict as $row) $ids[(int)$row['user_id']] = true;
+        $country = trim((string)($source['country_code'] ?? ''));
+        $region = trim((string)($source['region_code'] ?? ''));
+        $l5 = trim((string)($source['location_cell_l5'] ?? ''));
+        $l4 = trim((string)($source['location_cell_l4'] ?? ''));
 
-        if (count($ids) < $limit) {
+        if ($country !== '' && $region !== '' && $l5 !== '') {
+            $strict = $this->repo->strictNearbyL5(
+                (int)$source['user_id'],
+                $country,
+                $region,
+                $l5,
+                $limit
+            );
+            foreach ($strict as $row) $ids[(int)$row['user_id']] = true;
+        }
+
+        if (count($ids) < $limit && $country !== '' && $region !== '' && $l4 !== '') {
             $relaxed = $this->repo->relaxedNearbyL4(
                 (int)$source['user_id'],
-                (string)$source['country_code'],
-                (string)$source['region_code'],
-                (string)$source['location_cell_l4'],
+                $country,
+                $region,
+                $l4,
                 $limit
             );
             foreach ($relaxed as $row) $ids[(int)$row['user_id']] = true;
         }
 
-        if (count($ids) < $limit) {
+        if (count($ids) < $limit && $country !== '') {
             $fallback = $this->repo->broaderFallback(
                 (int)$source['user_id'],
-                (string)$source['country_code'],
+                $country,
                 $limit
             );
             foreach ($fallback as $row) $ids[(int)$row['user_id']] = true;

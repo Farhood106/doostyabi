@@ -106,28 +106,86 @@ final class CompatibilityScoringService
 
     private function scheduleOverlapSymmetric(array $aSlots, array $bSlots): float
     {
+        $aByDay = $this->normalizeSlotsByDay($aSlots);
+        $bByDay = $this->normalizeSlotsByDay($bSlots);
+
         $overlapMinutes = 0;
         $totalMinutesA = 0;
         $totalMinutesB = 0;
 
-        foreach ($aSlots as $slotA) {
-            $totalMinutesA += max(0, (int)$slotA['end_minute'] - (int)$slotA['start_minute']);
-            foreach ($bSlots as $slotB) {
-                if ((int)$slotA['weekday'] !== (int)$slotB['weekday']) continue;
-                $overlapMinutes += max(
-                    0,
-                    min((int)$slotA['end_minute'], (int)$slotB['end_minute'])
-                    - max((int)$slotA['start_minute'], (int)$slotB['start_minute'])
-                );
+        foreach ($aByDay as $day => $intervalsA) {
+            $intervalsB = $bByDay[$day] ?? [];
+
+            foreach ($intervalsA as $i) {
+                $totalMinutesA += max(0, $i[1] - $i[0]);
+            }
+            foreach ($intervalsB as $j) {
+                $totalMinutesB += max(0, $j[1] - $j[0]);
+            }
+
+            $i = 0;
+            $j = 0;
+            while ($i < count($intervalsA) && $j < count($intervalsB)) {
+                $start = max($intervalsA[$i][0], $intervalsB[$j][0]);
+                $end = min($intervalsA[$i][1], $intervalsB[$j][1]);
+                if ($end > $start) {
+                    $overlapMinutes += $end - $start;
+                }
+
+                if ($intervalsA[$i][1] <= $intervalsB[$j][1]) {
+                    $i++;
+                } else {
+                    $j++;
+                }
             }
         }
 
-        foreach ($bSlots as $slotB) {
-            $totalMinutesB += max(0, (int)$slotB['end_minute'] - (int)$slotB['start_minute']);
+        foreach ($bByDay as $day => $intervalsB) {
+            if (isset($aByDay[$day])) {
+                continue;
+            }
+            foreach ($intervalsB as $j) {
+                $totalMinutesB += max(0, $j[1] - $j[0]);
+            }
         }
 
         $unionMinutes = max(1, $totalMinutesA + $totalMinutesB - $overlapMinutes);
         return min(100, ($overlapMinutes / $unionMinutes) * 100);
+    }
+
+    private function normalizeSlotsByDay(array $slots): array
+    {
+        $byDay = [];
+        foreach ($slots as $slot) {
+            $day = (int)($slot['weekday'] ?? -1);
+            if ($day < 0 || $day > 6) {
+                continue;
+            }
+
+            $start = max(0, (int)($slot['start_minute'] ?? 0));
+            $end = min(24 * 60, (int)($slot['end_minute'] ?? 0));
+            if ($end <= $start) {
+                continue;
+            }
+
+            $byDay[$day][] = [$start, $end];
+        }
+
+        foreach ($byDay as $day => $intervals) {
+            usort($intervals, static fn(array $x, array $y): int => $x[0] <=> $y[0]);
+            $merged = [];
+            foreach ($intervals as $current) {
+                if ($merged === [] || $current[0] > $merged[count($merged) - 1][1]) {
+                    $merged[] = $current;
+                    continue;
+                }
+                $lastIdx = count($merged) - 1;
+                $merged[$lastIdx][1] = max($merged[$lastIdx][1], $current[1]);
+            }
+            $byDay[$day] = $merged;
+        }
+
+        return $byDay;
     }
 
     private function mutualPreferenceFit(array $a, array $b): float
