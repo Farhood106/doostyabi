@@ -35,16 +35,19 @@ final class HardFilterService
             $reasons[] = 'age_preference_mismatch';
         }
 
-        if (!$this->locationCompatible($source, $candidate)) {
-            $reasons[] = 'distance_too_far';
+        // Mandatory geography gate for MVP safety: same country only.
+        // Region/cell are ranking signals, not hard reject signals.
+        if (($source['country_code'] ?? '') !== ($candidate['country_code'] ?? '')) {
+            $reasons[] = 'country_mismatch';
         }
 
         if ($this->hasBoundaryConflict($source['boundaries'], $candidate['boundaries'])) {
             $reasons[] = 'boundary_conflict';
         }
 
-        if ($this->lifestyleConflict($source, $candidate)) {
-            $reasons[] = 'lifestyle_conflict';
+        // Hard-filter only strong lifestyle contradictions.
+        if ($this->strongLifestyleConflict($source, $candidate)) {
+            $reasons[] = 'lifestyle_conflict_strong';
         }
 
         return [
@@ -64,40 +67,43 @@ final class HardFilterService
             && $ageA >= (int)$b['age_min_pref'] && $ageA <= (int)$b['age_max_pref'];
     }
 
-    private function locationCompatible(array $a, array $b): bool
-    {
-        if (($a['country_code'] ?? '') !== ($b['country_code'] ?? '')) return false;
-        if (($a['region_code'] ?? '') !== ($b['region_code'] ?? '')) return false;
-
-        return (($a['location_cell_l5'] ?? '') === ($b['location_cell_l5'] ?? ''))
-            || (($a['location_cell_l4'] ?? '') === ($b['location_cell_l4'] ?? ''));
-    }
-
     private function hasBoundaryConflict(array $aBoundaries, array $bBoundaries): bool
     {
-        $index = [];
-        foreach ($bBoundaries as $b) {
-            $index[$b['boundary_key'] . '|' . $b['boundary_value']] = $b['importance'];
+        $aReq = $aAvoid = $bReq = $bAvoid = [];
+
+        foreach ($aBoundaries as $r) {
+            $key = $r['boundary_key'] . '|' . $r['boundary_value'];
+            if ($r['importance'] === 'required') $aReq[$key] = true;
+            if ($r['importance'] === 'avoid') $aAvoid[$key] = true;
         }
 
-        foreach ($aBoundaries as $a) {
-            $key = $a['boundary_key'] . '|' . $a['boundary_value'];
-            if (!isset($index[$key])) {
-                if ($a['importance'] === 'required') {
-                    return true;
-                }
-                continue;
-            }
-
-            if ($a['importance'] === 'avoid' && $index[$key] === 'required') {
-                return true;
-            }
+        foreach ($bBoundaries as $r) {
+            $key = $r['boundary_key'] . '|' . $r['boundary_value'];
+            if ($r['importance'] === 'required') $bReq[$key] = true;
+            if ($r['importance'] === 'avoid') $bAvoid[$key] = true;
         }
+
+        // Required vs avoid conflicts both directions
+        foreach (array_keys($aReq) as $k) {
+            if (isset($bAvoid[$k])) return true;
+        }
+        foreach (array_keys($bReq) as $k) {
+            if (isset($aAvoid[$k])) return true;
+        }
+
+        // Required item missing on the other side entirely
+        $bAll = [];
+        foreach ($bBoundaries as $r) $bAll[$r['boundary_key'] . '|' . $r['boundary_value']] = true;
+        foreach (array_keys($aReq) as $k) if (!isset($bAll[$k])) return true;
+
+        $aAll = [];
+        foreach ($aBoundaries as $r) $aAll[$r['boundary_key'] . '|' . $r['boundary_value']] = true;
+        foreach (array_keys($bReq) as $k) if (!isset($aAll[$k])) return true;
 
         return false;
     }
 
-    private function lifestyleConflict(array $a, array $b): bool
+    private function strongLifestyleConflict(array $a, array $b): bool
     {
         $smokeConflict = (($a['smoking_preference'] ?? '') === 'no' && ($b['smoking_preference'] ?? '') === 'yes')
             || (($b['smoking_preference'] ?? '') === 'no' && ($a['smoking_preference'] ?? '') === 'yes');
@@ -105,6 +111,6 @@ final class HardFilterService
         $drinkConflict = (($a['drinking_preference'] ?? '') === 'no' && ($b['drinking_preference'] ?? '') === 'yes')
             || (($b['drinking_preference'] ?? '') === 'no' && ($a['drinking_preference'] ?? '') === 'yes');
 
-        return $smokeConflict || $drinkConflict;
+        return $smokeConflict && $drinkConflict;
     }
 }

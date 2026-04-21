@@ -10,6 +10,24 @@
 - `src/Services/Matching/CandidateGenerationService.php`
 - `bin/cron_generate_candidates.php`
 
+## Candidate selection strategy (staged buckets)
+For each source user, candidate IDs are discovered in stages:
+
+1. **Strict nearby**
+   - same `country_code`
+   - same `region_code`
+   - same `location_cell_l5`
+
+2. **Relaxed nearby** (if still below target limit)
+   - same `country_code`
+   - same `region_code`
+   - same `location_cell_l4`
+
+3. **Broader fallback** (if still below target limit)
+   - same `country_code`
+
+This avoids cross-comparing `location_cell_l4` with candidate `location_cell_l5` and keeps retrieval deterministic and shared-hosting friendly.
+
 ## Hard filters
 Minimum enforced exclusions:
 1. same user
@@ -17,13 +35,17 @@ Minimum enforced exclusions:
 3. inactive users
 4. no active goal overlap
 5. age preference mismatch (both directions)
-6. coarse location mismatch
-7. boundary conflicts
-8. core lifestyle conflicts (smoking/drinking)
+6. **country mismatch** (mandatory geography gate)
+7. boundary conflicts (symmetric required/avoid checks)
+8. strong lifestyle contradiction (smoking+drinking conflict together)
 
 Output fields:
 - `eligible_for_display`
 - `rejection_reason_codes`
+
+### Geography rule rationale
+Country remains a hard filter for safety/privacy and practical distance constraints in MVP.
+Region/cell are ranking/selection signals to avoid over-strict cold-start rejection.
 
 ## Scoring model
 Weighted score out of 100:
@@ -40,19 +62,35 @@ Outputs:
 - `top_match_reasons`
 - `caution_points`
 
+### Symmetric schedule overlap formula
+Schedule overlap uses a symmetric ratio:
+
+`overlap_minutes / union_minutes`
+
+where:
+- `overlap_minutes` = summed intersection minutes on matching weekdays
+- `union_minutes` = `total_source_minutes + total_candidate_minutes - overlap_minutes`
+
+This is balanced for both users and avoids one-sided normalization.
+
 ## Queue updates
 - Writes to `match_candidate_queue` through upsert on `(user_id, candidate_user_id, goal_id)`.
+- **Queue is written per overlapping goal** (not just first overlap).
 - Rejected candidates store `rejection_reason_code` and short expiry (`+2 days`).
-- Scored candidates store JSON breakdown and longer expiry (`+7 days`).
+- Scored candidates store explanation payload JSON and longer expiry (`+7 days`).
 - Low scores are marked rejected with `low_compatibility_score`.
 
-## No-match state logic
+## No-match lifecycle
 After per-user processing:
-- if strong candidates (`score >= 70`) exist -> `searching`
-- else if profile is weak (`about_me` or `looking_for` empty) -> `profile_improvement_suggested`
-- else -> `expand_preferences_suggested`
+- if strong candidates (`score >= 70`) exist:
+  - deactivate active no-match state for the scope (user is no longer in no-match)
+- otherwise:
+  - deactivate previous active no-match state
+  - insert new active state:
+    - `profile_improvement_suggested` when profile quality is weak
+    - `expand_preferences_suggested` otherwise
 
-State is persisted through `no_match_states` with active-state rollover.
+This keeps active no-match rows semantically correct.
 
 ## Cron usage
 Example crontab every 10 minutes:

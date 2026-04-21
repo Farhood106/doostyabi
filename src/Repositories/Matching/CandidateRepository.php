@@ -49,7 +49,7 @@ final class CandidateRepository
         return $row;
     }
 
-    public function nearbyCandidates(int $userId, string $countryCode, string $regionCode, string $l4, int $limit): array
+    public function strictNearbyL5(int $userId, string $countryCode, string $regionCode, string $l5, int $limit): array
     {
         $stmt = $this->pdo->prepare(
             "SELECT u.id AS user_id
@@ -59,7 +59,31 @@ final class CandidateRepository
                AND u.id <> :uid
                AND p.country_code = :country
                AND p.region_code = :region
-               AND (p.location_cell_l4 = :l4 OR p.location_cell_l5 = :l4)
+               AND p.location_cell_l5 = :l5
+             ORDER BY u.id ASC
+             LIMIT :limit"
+        );
+        $stmt->bindValue(':uid', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':country', $countryCode);
+        $stmt->bindValue(':region', $regionCode);
+        $stmt->bindValue(':l5', $l5);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
+
+    public function relaxedNearbyL4(int $userId, string $countryCode, string $regionCode, string $l4, int $limit): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT u.id AS user_id
+             FROM users u
+             JOIN profiles p ON p.user_id = u.id
+             WHERE u.status = 'active'
+               AND u.id <> :uid
+               AND p.country_code = :country
+               AND p.region_code = :region
+               AND p.location_cell_l4 = :l4
              ORDER BY u.id ASC
              LIMIT :limit"
         );
@@ -73,7 +97,7 @@ final class CandidateRepository
         return $stmt->fetchAll();
     }
 
-    public function fallbackCandidates(int $userId, int $limit): array
+    public function broaderFallback(int $userId, string $countryCode, int $limit): array
     {
         $stmt = $this->pdo->prepare(
             "SELECT u.id AS user_id
@@ -81,10 +105,12 @@ final class CandidateRepository
              JOIN profiles p ON p.user_id = u.id
              WHERE u.status = 'active'
                AND u.id <> :uid
+               AND p.country_code = :country
              ORDER BY u.id ASC
              LIMIT :limit"
         );
         $stmt->bindValue(':uid', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':country', $countryCode);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
@@ -154,15 +180,20 @@ final class CandidateRepository
         ]);
     }
 
-    public function upsertNoMatchState(int $userId, ?int $goalId, string $state, array $context): void
+    public function deactivateActiveNoMatchStates(int $userId, ?int $goalId): void
     {
         $stmt = $this->pdo->prepare(
             "UPDATE no_match_states
              SET is_active = 0, updated_at = NOW()
-             WHERE user_id = :uid AND goal_scope_key = COALESCE(:goal, 0) AND is_active = 1"
+             WHERE user_id = :uid
+               AND goal_scope_key = COALESCE(:goal, 0)
+               AND is_active = 1"
         );
         $stmt->execute(['uid' => $userId, 'goal' => $goalId]);
+    }
 
+    public function insertNoMatchState(int $userId, ?int $goalId, string $state, array $context): void
+    {
         $stmt = $this->pdo->prepare(
             "INSERT INTO no_match_states
                 (user_id, goal_id, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at)

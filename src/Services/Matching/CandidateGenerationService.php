@@ -25,51 +25,95 @@ final class CandidateGenerationService
             return;
         }
 
-        $candidates = $this->repo->nearbyCandidates(
-            $userId,
-            (string)$source['country_code'],
-            (string)$source['region_code'],
-            (string)$source['location_cell_l4'],
-            $candidateLimit
-        );
-
-        if ($candidates === []) {
-            $candidates = $this->repo->fallbackCandidates($userId, $candidateLimit);
-        }
-
+        $candidateIds = $this->stagedCandidateIds($source, $candidateLimit);
         $strong = 0;
-        $goalId = $source['goals'][0] ?? null;
+        $primaryGoalId = $source['goals'][0] ?? null;
 
-        foreach ($candidates as $candidateRow) {
+        foreach ($candidateIds as $candidateId) {
             try {
-                $candidate = $this->repo->userContext((int)$candidateRow['user_id']);
+                $candidate = $this->repo->userContext($candidateId);
                 if (!$candidate) continue;
 
                 $hard = $this->hardFilter->evaluate($source, $candidate);
                 $goalOverlap = $hard['goal_overlap'];
-                $activeGoalId = $goalOverlap[0] ?? $goalId;
-                if ($activeGoalId === null) {
-                    continue;
+
+                if ($goalOverlap === [] && $primaryGoalId !== null) {
+                    // keep rejection queue visibility under source primary goal
+                    $goalOverlap = [(int)$primaryGoalId];
                 }
 
                 if (!$hard['eligible_for_display']) {
-                    $this->queue->writeRejected($userId, (int)$candidate['user_id'], (int)$activeGoalId, $hard['rejection_reason_codes'][0]);
+                    foreach ($goalOverlap as $goalId) {
+                        $this->queue->writeRejected($userId, (int)$candidate['user_id'], (int)$goalId, $hard['rejection_reason_codes'][0]);
+                    }
                     continue;
                 }
 
                 $score = $this->scoring->score($source, $candidate, $goalOverlap);
                 $explanation = $this->explanations->build($score);
-                $this->queue->writeScored($userId, (int)$candidate['user_id'], (int)$activeGoalId, (float)$score['compatibility_score'], $explanation);
+
+                foreach ($goalOverlap as $goalId) {
+                    $this->queue->writeScored($userId, (int)$candidate['user_id'], (int)$goalId, (float)$score['compatibility_score'], $explanation);
+                }
 
                 if ((float)$score['compatibility_score'] >= 70.0) {
                     $strong++;
                 }
             } catch (Throwable $e) {
-                error_log(sprintf('[candidate_generation] %s user=%d candidate=%d msg=%s', $e::class, $userId, (int)$candidateRow['user_id'], $e->getMessage()));
+                error_log(sprintf('[candidate_generation] %s user=%d candidate=%d msg=%s', $e::class, $userId, $candidateId, $e->getMessage()));
             }
         }
 
-        $profileWeak = empty($source['about_me']) || empty($source['looking_for']);
-        $this->noMatch->update($userId, $goalId ? (int)$goalId : null, $strong, $profileWeak);
+        $profileWeak = $this->isProfileWeak($source);
+        $this->noMatch->update($userId, $primaryGoalId ? (int)$primaryGoalId : null, $strong, $profileWeak);
+    }
+
+    private function stagedCandidateIds(array $source, int $limit): array
+    {
+        $ids = [];
+
+        $strict = $this->repo->strictNearbyL5(
+            (int)$source['user_id'],
+            (string)$source['country_code'],
+            (string)$source['region_code'],
+            (string)$source['location_cell_l5'],
+            $limit
+        );
+        foreach ($strict as $row) $ids[(int)$row['user_id']] = true;
+
+        if (count($ids) < $limit) {
+            $relaxed = $this->repo->relaxedNearbyL4(
+                (int)$source['user_id'],
+                (string)$source['country_code'],
+                (string)$source['region_code'],
+                (string)$source['location_cell_l4'],
+                $limit
+            );
+            foreach ($relaxed as $row) $ids[(int)$row['user_id']] = true;
+        }
+
+        if (count($ids) < $limit) {
+            $fallback = $this->repo->broaderFallback(
+                (int)$source['user_id'],
+                (string)$source['country_code'],
+                $limit
+            );
+            foreach ($fallback as $row) $ids[(int)$row['user_id']] = true;
+        }
+
+        return array_slice(array_keys($ids), 0, $limit);
+    }
+
+    private function isProfileWeak(array $source): bool
+    {
+        $weakText = empty($source['about_me']) || empty($source['looking_for']);
+        $weakGoals = count($source['goals']) === 0;
+        $weakSchedule = count($source['availability']) === 0;
+        $weakDimensions = 0;
+        foreach (['social_energy','communication_style','emotional_openness','relationship_pace','independence_level','boundary_sensitivity','structure_vs_spontaneity'] as $f) {
+            if (empty($source[$f])) $weakDimensions++;
+        }
+
+        return $weakText || $weakGoals || $weakSchedule || $weakDimensions >= 4;
     }
 }

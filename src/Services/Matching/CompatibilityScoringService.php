@@ -21,7 +21,7 @@ final class CompatibilityScoringService
         $dimensions = $this->dimensionSimilarity($source, $candidate);
         $lifestyle = $this->lifestyleSimilarity($source, $candidate);
         $distance = $this->distanceFit($source, $candidate);
-        $schedule = $this->scheduleOverlap($source['availability'], $candidate['availability']);
+        $schedule = $this->scheduleOverlapSymmetric($source['availability'], $candidate['availability']);
         $mutualPref = $this->mutualPreferenceFit($source, $candidate);
 
         $weighted =
@@ -68,59 +68,66 @@ final class CompatibilityScoringService
             'relationship_pace', 'independence_level', 'boundary_sensitivity', 'structure_vs_spontaneity',
         ];
 
-        $score = 0;
+        $sum = 0;
         $count = 0;
         foreach ($fields as $f) {
             if ($a[$f] === null || $b[$f] === null || $a[$f] === '' || $b[$f] === '') continue;
             $diff = abs((int)$a[$f] - (int)$b[$f]);
-            $score += max(0, 100 - ($diff * 25));
+            $sum += max(0, 100 - ($diff * 25));
             $count++;
         }
 
-        return $count > 0 ? $score / $count : 50.0;
+        return $count > 0 ? $sum / $count : 50.0;
     }
 
     private function lifestyleSimilarity(array $a, array $b): float
     {
         $fields = ['smoking_preference', 'drinking_preference', 'activity_level'];
-        $total = 0;
+        $sum = 0;
         $count = 0;
 
         foreach ($fields as $f) {
             if (empty($a[$f]) || empty($b[$f])) continue;
-            $total += ($a[$f] === $b[$f]) ? 100 : 40;
+            $sum += ($a[$f] === $b[$f]) ? 100 : 40;
             $count++;
         }
 
-        return $count > 0 ? $total / $count : 50.0;
+        return $count > 0 ? $sum / $count : 50.0;
     }
 
     private function distanceFit(array $a, array $b): float
     {
+        if (($a['country_code'] ?? '') !== ($b['country_code'] ?? '')) return 0;
+        if (($a['region_code'] ?? '') !== ($b['region_code'] ?? '')) return 45;
         if (($a['location_cell_l5'] ?? '') === ($b['location_cell_l5'] ?? '')) return 100;
-        if (($a['location_cell_l4'] ?? '') === ($b['location_cell_l4'] ?? '')) return 70;
-        return 35;
+        if (($a['location_cell_l4'] ?? '') === ($b['location_cell_l4'] ?? '')) return 75;
+        return 55;
     }
 
-    private function scheduleOverlap(array $aSlots, array $bSlots): float
+    private function scheduleOverlapSymmetric(array $aSlots, array $bSlots): float
     {
-        $overlap = 0;
-        $possible = 0;
+        $overlapMinutes = 0;
+        $totalMinutesA = 0;
+        $totalMinutesB = 0;
 
-        foreach ($aSlots as $a) {
-            foreach ($bSlots as $b) {
-                if ((int)$a['weekday'] !== (int)$b['weekday']) continue;
-                $possible += max(0, min((int)$a['end_minute'], (int)$b['end_minute']) - max((int)$a['start_minute'], (int)$b['start_minute']));
+        foreach ($aSlots as $slotA) {
+            $totalMinutesA += max(0, (int)$slotA['end_minute'] - (int)$slotA['start_minute']);
+            foreach ($bSlots as $slotB) {
+                if ((int)$slotA['weekday'] !== (int)$slotB['weekday']) continue;
+                $overlapMinutes += max(
+                    0,
+                    min((int)$slotA['end_minute'], (int)$slotB['end_minute'])
+                    - max((int)$slotA['start_minute'], (int)$slotB['start_minute'])
+                );
             }
         }
 
-        foreach ($aSlots as $a) {
-            $overlap += max(1, ((int)$a['end_minute'] - (int)$a['start_minute']));
+        foreach ($bSlots as $slotB) {
+            $totalMinutesB += max(0, (int)$slotB['end_minute'] - (int)$slotB['start_minute']);
         }
 
-        if ($overlap <= 0) return 40;
-
-        return min(100, ($possible / $overlap) * 100);
+        $unionMinutes = max(1, $totalMinutesA + $totalMinutesB - $overlapMinutes);
+        return min(100, ($overlapMinutes / $unionMinutes) * 100);
     }
 
     private function mutualPreferenceFit(array $a, array $b): float
