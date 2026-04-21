@@ -124,3 +124,39 @@ It uses an in-memory SQLite database to verify:
 - queue rows for all overlapping goals
 - no-match state deactivation when strong candidates exist
 - profile improvement state when profile is weak and no strong candidates exist
+
+## Match card build and delivery (v1)
+Cards are built from eligible queue rows in `match_candidate_queue` where:
+- `hard_filter_passed = 1`
+- `compatibility_score` is present
+- `status IN ('scored', 'presented')`
+- row is not expired
+
+Builder output is materialized into `match_cards` and linked through `matches`:
+- `age_range_label_key` from candidate age bucket (e.g., `age_25_29`)
+- `approx_distance_bucket` from coarse location (`same_area`, `nearby_region`, `same_country`)
+- `compatibility_score` (numeric score only; no identity fields)
+- `emotional_summary_key` from score/profile-safe rule engine
+- `match_reasons_json` filtered to translatable explanation keys
+- `communication_boundaries_json` filtered to safe abstract boundaries
+- `schedule_overlap_key` (`schedule_overlap_high|medium|low`)
+- `card_version` for refresh/versioning
+
+### Privacy-safe transformations
+The card builder intentionally excludes:
+- names, photos, phone/email/handles, exact location and direct identifiers
+- revealable profile data and contact fields
+- non-key free-form explanation text
+
+Only safe summary artifacts are used (coarse profile signals, boundary tags, score keys).
+
+### Delivery ordering
+Card delivery reads `match_cards` joined to active `matches` states and returns:
+1) highest `compatibility_score` first
+2) newest `updated_at` as tie-breaker
+3) stable `id` order as final tie-breaker
+
+### Refresh flow
+`bin/cron_build_match_cards.php` refreshes cards by upserting from queue state and sets
+queue rows to `presented` after successful card upsert. Re-running refresh keeps cards in
+sync with the latest scored queue data and preserves future compatibility for one-sided/mutual interest flow.
