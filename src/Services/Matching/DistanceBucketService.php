@@ -9,7 +9,7 @@ final class DistanceBucketService
     public function fromProfiles(array $viewer, array $candidate): string
     {
         if (($viewer['country_code'] ?? '') !== ($candidate['country_code'] ?? '')) {
-            return 'same_country';
+            return 'different_country';
         }
 
         if (($viewer['region_code'] ?? '') !== ($candidate['region_code'] ?? '')) {

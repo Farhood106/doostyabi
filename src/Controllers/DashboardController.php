@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Auth\AuthService;
 use App\Core\Request;
 use App\Core\View;
 use App\Repositories\Matching\MatchCardRepository;
@@ -16,7 +17,7 @@ final class DashboardController
 
     public function index(Request $request): void
     {
-        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $userId = (int)($this->app->make(AuthService::class)->userId() ?? 0);
         $cards = [];
         if ($userId > 0) {
             $repo = new MatchCardRepository($this->app->make(PDO::class));

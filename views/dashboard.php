@@ -8,9 +8,9 @@
     <li><a href="/onboarding/goals"><?= htmlspecialchars(t('onboarding.goals_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
 </ul>
 
-<h3><?= htmlspecialchars(t('dashboard.match_cards_title', 'Anonymous match cards'), ENT_QUOTES, 'UTF-8') ?></h3>
+<h3><?= htmlspecialchars(t('dashboard.match_cards_title'), ENT_QUOTES, 'UTF-8') ?></h3>
 <?php if (empty($cards ?? [])): ?>
-    <p><?= htmlspecialchars(t('dashboard.match_cards_empty', 'No match cards yet.'), ENT_QUOTES, 'UTF-8') ?></p>
+    <p><?= htmlspecialchars(t('dashboard.match_cards_empty'), ENT_QUOTES, 'UTF-8') ?></p>
 <?php else: ?>
     <ul>
         <?php foreach ($cards as $card): ?>

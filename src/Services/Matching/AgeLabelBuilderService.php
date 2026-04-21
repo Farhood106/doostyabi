@@ -13,11 +13,14 @@ final class AgeLabelBuilderService
         }
 
         $age = max(18, (int)date('Y') - $birthYear);
-        $start = (int)(floor(($age - 20) / 5) * 5 + 20);
-        if ($start < 18) {
-            $start = 18;
+        if ($age <= 24) {
+            return 'age_18_24';
+        }
+        if ($age >= 60) {
+            return 'age_60_plus';
         }
 
+        $start = (int)(floor(($age - 25) / 5) * 5 + 25);
         $end = $start + 4;
 
         return sprintf('age_%d_%d', $start, $end);

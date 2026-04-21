@@ -8,6 +8,17 @@ use App\Repositories\Matching\MatchCardRepository;
 
 final class MatchCardBuilderService
 {
+    private const SAFE_BOUNDARY_KEY_ALLOWLIST = [
+        'communication_tone',
+        'response_window',
+        'check_in_frequency',
+        'conflict_style',
+        'social_energy_preference',
+        'plans_flexibility',
+        'alone_time_preference',
+        'conversation_depth',
+    ];
+
     public function __construct(
         private readonly MatchCardRepository $repo,
         private readonly AgeLabelBuilderService $ageLabel,
@@ -98,8 +109,13 @@ final class MatchCardBuilderService
                 continue;
             }
 
-            // Privacy-safe: include abstract preference tags only, never identity fields.
-            if (in_array($key, ['name', 'phone', 'email', 'address', 'instagram', 'telegram', 'photo'], true)) {
+            // Privacy-safe allowlist: expose only pre-approved abstract keys.
+            if (!in_array($key, self::SAFE_BOUNDARY_KEY_ALLOWLIST, true)) {
+                continue;
+            }
+
+            // Keep values key-like, not free text.
+            if (!preg_match('/^[a-z0-9_\\-]{1,40}$/i', $value)) {
                 continue;
             }
 
