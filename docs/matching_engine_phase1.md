@@ -109,3 +109,18 @@ Arguments:
 1. users batch limit
 2. users batch offset
 3. candidate limit per user
+
+## Verification fixture (lightweight)
+Run this executable fixture without a full test framework:
+
+```bash
+php bin/verify_matching_phase1.php
+```
+
+It uses an in-memory SQLite database to verify:
+- strict/relaxed/fallback candidate selection tiers
+- blocked pair and country mismatch hard rejections
+- symmetric schedule-overlap scoring
+- queue rows for all overlapping goals
+- no-match state deactivation when strong candidates exist
+- profile improvement state when profile is weak and no strong candidates exist

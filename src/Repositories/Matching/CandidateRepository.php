@@ -152,20 +152,39 @@ final class CandidateRepository
 
     public function upsertCandidateQueue(int $userId, int $candidateId, int $goalId, array $payload): void
     {
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO match_candidate_queue
-                (user_id, candidate_user_id, goal_id, hard_filter_passed, compatibility_score, score_breakdown_json, rejection_reason_code, status, queued_at, processed_at, expires_at)
-             VALUES
-                (:uid, :cid, :goal, :passed, :score, :breakdown, :reason, :status, NOW(), NOW(), :expires)
-             ON DUPLICATE KEY UPDATE
-                hard_filter_passed = VALUES(hard_filter_passed),
-                compatibility_score = VALUES(compatibility_score),
-                score_breakdown_json = VALUES(score_breakdown_json),
-                rejection_reason_code = VALUES(rejection_reason_code),
-                status = VALUES(status),
-                processed_at = NOW(),
-                expires_at = VALUES(expires_at)"
-        );
+        if ($this->isSqlite()) {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO match_candidate_queue
+                    (user_id, candidate_user_id, goal_id, hard_filter_passed, compatibility_score, score_breakdown_json, rejection_reason_code, status, queued_at, processed_at, expires_at)
+                 VALUES
+                    (:uid, :cid, :goal, :passed, :score, :breakdown, :reason, :status, :queued, :processed, :expires)
+                 ON CONFLICT(user_id, candidate_user_id, goal_id) DO UPDATE SET
+                    hard_filter_passed = excluded.hard_filter_passed,
+                    compatibility_score = excluded.compatibility_score,
+                    score_breakdown_json = excluded.score_breakdown_json,
+                    rejection_reason_code = excluded.rejection_reason_code,
+                    status = excluded.status,
+                    processed_at = excluded.processed_at,
+                    expires_at = excluded.expires_at"
+            );
+        } else {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO match_candidate_queue
+                    (user_id, candidate_user_id, goal_id, hard_filter_passed, compatibility_score, score_breakdown_json, rejection_reason_code, status, queued_at, processed_at, expires_at)
+                 VALUES
+                    (:uid, :cid, :goal, :passed, :score, :breakdown, :reason, :status, :queued, :processed, :expires)
+                 ON DUPLICATE KEY UPDATE
+                    hard_filter_passed = VALUES(hard_filter_passed),
+                    compatibility_score = VALUES(compatibility_score),
+                    score_breakdown_json = VALUES(score_breakdown_json),
+                    rejection_reason_code = VALUES(rejection_reason_code),
+                    status = VALUES(status),
+                    processed_at = VALUES(processed_at),
+                    expires_at = VALUES(expires_at)"
+            );
+        }
+
+        $now = $this->now();
 
         $stmt->execute([
             'uid' => $userId,
@@ -176,6 +195,8 @@ final class CandidateRepository
             'breakdown' => $payload['score_breakdown_json'],
             'reason' => $payload['rejection_reason_code'],
             'status' => $payload['status'],
+            'queued' => $now,
+            'processed' => $now,
             'expires' => $payload['expires_at'],
         ]);
     }
@@ -184,12 +205,12 @@ final class CandidateRepository
     {
         $stmt = $this->pdo->prepare(
             "UPDATE no_match_states
-             SET is_active = 0, updated_at = NOW()
+             SET is_active = 0, updated_at = :updated
              WHERE user_id = :uid
                AND goal_scope_key = COALESCE(:goal, 0)
                AND is_active = 1"
         );
-        $stmt->execute(['uid' => $userId, 'goal' => $goalId]);
+        $stmt->execute(['uid' => $userId, 'goal' => $goalId, 'updated' => $this->now()]);
     }
 
     public function insertNoMatchState(int $userId, ?int $goalId, string $state, array $context): void
@@ -198,13 +219,27 @@ final class CandidateRepository
             "INSERT INTO no_match_states
                 (user_id, goal_id, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at)
              VALUES
-                (:uid, :goal, :state, :context, 1, DATE_ADD(NOW(), INTERVAL 1 DAY), 1, NOW(), NOW())"
+                (:uid, :goal, :state, :context, 1, :next_recheck, 1, :created, :updated)"
         );
+        $now = $this->now();
         $stmt->execute([
             'uid' => $userId,
             'goal' => $goalId,
             'state' => $state,
             'context' => json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'next_recheck' => date('Y-m-d H:i:s', strtotime($now . ' +1 day')),
+            'created' => $now,
+            'updated' => $now,
         ]);
+    }
+
+    private function now(): string
+    {
+        return date('Y-m-d H:i:s');
+    }
+
+    private function isSqlite(): bool
+    {
+        return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
     }
 }
