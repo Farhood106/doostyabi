@@ -1,4 +1,15 @@
 <?php ob_start(); ?>
+<?php
+$translateCardKey = static function (string $translationKey): string {
+    $value = t($translationKey);
+    if ($value === $translationKey) {
+        $fallback = t('match_card.unknown');
+        return $fallback === 'match_card.unknown' ? '—' : $fallback;
+    }
+
+    return $value;
+};
+?>
 <h2><?= htmlspecialchars(t('dashboard.title'), ENT_QUOTES, 'UTF-8') ?></h2>
 <p><?= htmlspecialchars(t('dashboard.description'), ENT_QUOTES, 'UTF-8') ?></p>
 <ul>
@@ -17,11 +28,11 @@
             <li>
                 <strong><?= htmlspecialchars((string)$card['compatibility_score'], ENT_QUOTES, 'UTF-8') ?></strong>
                 |
-                <?= htmlspecialchars((string)$card['age_range_label_key'], ENT_QUOTES, 'UTF-8') ?>
+                <?= htmlspecialchars($translateCardKey('match_card.age_label.' . (string)$card['age_range_label_key']), ENT_QUOTES, 'UTF-8') ?>
                 |
-                <?= htmlspecialchars((string)$card['approx_distance_bucket'], ENT_QUOTES, 'UTF-8') ?>
+                <?= htmlspecialchars($translateCardKey('match_card.distance_bucket.' . (string)$card['approx_distance_bucket']), ENT_QUOTES, 'UTF-8') ?>
                 |
-                <?= htmlspecialchars((string)$card['emotional_summary_key'], ENT_QUOTES, 'UTF-8') ?>
+                <?= htmlspecialchars($translateCardKey('match_card.emotional_summary.' . (string)$card['emotional_summary_key']), ENT_QUOTES, 'UTF-8') ?>
             </li>
         <?php endforeach; ?>
     </ul>
