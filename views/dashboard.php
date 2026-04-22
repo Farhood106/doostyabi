@@ -39,7 +39,11 @@ $csrf = app()->make(App\Security\Csrf::class);
                 <?= htmlspecialchars($translateCardKey('match_card.emotional_summary.' . (string)$card['emotional_summary_key']), ENT_QUOTES, 'UTF-8') ?>
 
                 <?php if (in_array((string)($card['match_status'] ?? ''), ['mutual', 'chat_open'], true)): ?>
-                    <button class="btn" type="button"><?= htmlspecialchars(t('match.chat.open_or_coming_soon'), ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php if (!empty($card['chat_id'])): ?>
+                        <a class="btn" href="/chat?chat_id=<?= (int)$card['chat_id'] ?>" style="display:inline-block;text-decoration:none;"><?= htmlspecialchars(t('match.chat.enter'), ENT_QUOTES, 'UTF-8') ?></a>
+                    <?php else: ?>
+                        <button class="btn" type="button"><?= htmlspecialchars(t('match.chat.open_or_coming_soon'), ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php endif; ?>
                 <?php else: ?>
                     <form method="post" action="/match-interest" style="display:inline-block;margin-inline-start:10px;">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">

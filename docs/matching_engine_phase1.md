@@ -199,3 +199,43 @@ It verifies:
 - mutual detection across both users
 - chat creation on mutual
 - passed-card exclusion from active delivery
+
+## Chat foundation and entry flow (v1)
+### Access rules
+- Chat entry route: `GET /chat?chat_id=<id>` (or `match_id` resolution fallback).
+- Access is allowed only when authenticated user is one of the match participants.
+- Chat must be `open` and match must be in `mutual` or `chat_open`.
+- Non-participants and invalid chat/match pairs are blocked and redirected.
+
+### Sending messages
+- `POST /chat/send` inserts a `messages` row with `message_type='text'`.
+- Allowed only for chat participants and only while chat status is `open`.
+- Message body is validated (non-empty, max length).
+
+### Polling design
+- `GET /chat/poll?chat_id=<id>&since_id=<message_id>`
+- Returns only messages for that specific accessible chat and only `id > since_id`.
+- Lightweight AJAX polling (`setInterval`) keeps shared-hosting compatibility.
+
+### Intentional omissions (privacy/safety MVP scope)
+- no seen/read receipts
+- no typing indicator
+- no online/last-seen presence
+
+### Chat-open card linkage
+- Dashboard cards already at `mutual` / `chat_open` show chat entry action when `chat_id` exists.
+- Normal interest controls are suppressed for these cards.
+
+## Chat verification fixture
+Run:
+
+```bash
+php bin/verify_chat_flow.php
+```
+
+It verifies:
+- authorized chat access
+- unauthorized chat access blocked
+- send message success
+- send message blocked for non-participants
+- polling returns only relevant/new messages

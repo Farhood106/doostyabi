@@ -219,9 +219,11 @@ final class MatchCardRepository
                     mc.emotional_summary_key, mc.match_reasons_json, mc.communication_boundaries_json,
                     mc.schedule_overlap_key, mc.card_version, mc.updated_at,
                     m.status AS match_status,
+                    c.id AS chat_id,
                     COALESCE(mis.current_interest, 'none') AS viewer_interest
              FROM match_cards mc
              JOIN matches m ON m.id = mc.match_id
+             LEFT JOIN chats c ON c.match_id = mc.match_id
              LEFT JOIN match_interest_states mis
                     ON mis.match_id = mc.match_id
                    AND mis.user_id = mc.viewer_user_id

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AuthController;
+use App\Controllers\ChatController;
 use App\Controllers\DashboardController;
 use App\Controllers\MatchInterestController;
 use App\Controllers\OnboardingController;
@@ -17,6 +18,9 @@ $router->post('/logout', [AuthController::class, 'logout'], [$authMiddleware]);
 
 $router->get('/dashboard', [DashboardController::class, 'index'], [$authMiddleware]);
 $router->post('/match-interest', [MatchInterestController::class, 'store'], [$authMiddleware]);
+$router->get('/chat', [ChatController::class, 'show'], [$authMiddleware]);
+$router->post('/chat/send', [ChatController::class, 'send'], [$authMiddleware]);
+$router->get('/chat/poll', [ChatController::class, 'poll'], [$authMiddleware]);
 
 $router->get('/onboarding/profile', [OnboardingController::class, 'showProfile'], [$authMiddleware]);
 $router->post('/onboarding/profile', [OnboardingController::class, 'saveProfile'], [$authMiddleware]);

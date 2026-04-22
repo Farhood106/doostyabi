@@ -68,6 +68,12 @@ $pdo->exec('CREATE TABLE match_interest_states (
     updated_at TEXT,
     UNIQUE(match_id, user_id)
 )');
+$pdo->exec('CREATE TABLE chats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL,
+    status TEXT,
+    opened_at TEXT
+)');
 $pdo->exec('CREATE TABLE match_cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id INTEGER,
