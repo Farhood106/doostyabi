@@ -9,6 +9,7 @@ $translateCardKey = static function (string $translationKey): string {
 
     return $value;
 };
+$csrf = app()->make(App\Security\Csrf::class);
 ?>
 <h2><?= htmlspecialchars(t('dashboard.title'), ENT_QUOTES, 'UTF-8') ?></h2>
 <p><?= htmlspecialchars(t('dashboard.description'), ENT_QUOTES, 'UTF-8') ?></p>
@@ -33,6 +34,23 @@ $translateCardKey = static function (string $translationKey): string {
                 <?= htmlspecialchars($translateCardKey('match_card.distance_bucket.' . (string)$card['approx_distance_bucket']), ENT_QUOTES, 'UTF-8') ?>
                 |
                 <?= htmlspecialchars($translateCardKey('match_card.emotional_summary.' . (string)$card['emotional_summary_key']), ENT_QUOTES, 'UTF-8') ?>
+
+                <form method="post" action="/match-interest" style="display:inline-block;margin-inline-start:10px;">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="match_id" value="<?= (int)$card['match_id'] ?>">
+
+                    <?php if (($card['viewer_interest'] ?? 'none') !== 'interested'): ?>
+                        <button class="btn" type="submit" name="action" value="interested"><?= htmlspecialchars(t('match.interest.interested'), ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php endif; ?>
+
+                    <?php if (($card['viewer_interest'] ?? 'none') !== 'passed'): ?>
+                        <button class="btn" type="submit" name="action" value="pass"><?= htmlspecialchars(t('match.interest.pass'), ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php endif; ?>
+
+                    <?php if (in_array(($card['viewer_interest'] ?? 'none'), ['interested', 'passed'], true)): ?>
+                        <button class="btn" type="submit" name="action" value="undo"><?= htmlspecialchars(t('match.interest.undo'), ENT_QUOTES, 'UTF-8') ?></button>
+                    <?php endif; ?>
+                </form>
             </li>
         <?php endforeach; ?>
     </ul>

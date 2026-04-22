@@ -217,11 +217,16 @@ final class MatchCardRepository
             "SELECT mc.id, mc.match_id, mc.viewer_user_id,
                     mc.age_range_label_key, mc.approx_distance_bucket, mc.compatibility_score,
                     mc.emotional_summary_key, mc.match_reasons_json, mc.communication_boundaries_json,
-                    mc.schedule_overlap_key, mc.card_version, mc.updated_at
+                    mc.schedule_overlap_key, mc.card_version, mc.updated_at,
+                    COALESCE(mis.current_interest, 'none') AS viewer_interest
              FROM match_cards mc
              JOIN matches m ON m.id = mc.match_id
+             LEFT JOIN match_interest_states mis
+                    ON mis.match_id = mc.match_id
+                   AND mis.user_id = mc.viewer_user_id
              WHERE mc.viewer_user_id = :uid
                AND m.status IN ('suggested', 'interested_one_side', 'mutual', 'chat_open')
+               AND COALESCE(mis.current_interest, 'none') <> 'passed'
              ORDER BY mc.compatibility_score DESC, mc.updated_at DESC, mc.id DESC
              LIMIT :limit OFFSET :offset"
         );

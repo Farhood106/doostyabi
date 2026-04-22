@@ -60,6 +60,14 @@ $pdo->exec('CREATE TABLE matches (
     updated_at TEXT,
     UNIQUE (user_a_id, user_b_id, goal_id)
 )');
+$pdo->exec('CREATE TABLE match_interest_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    current_interest TEXT NOT NULL,
+    updated_at TEXT,
+    UNIQUE(match_id, user_id)
+)');
 $pdo->exec('CREATE TABLE match_cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     match_id INTEGER,

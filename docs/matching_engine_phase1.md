@@ -160,3 +160,42 @@ Card delivery reads `match_cards` joined to active `matches` states and returns:
 `bin/cron_build_match_cards.php` refreshes cards by upserting from queue state and sets
 queue rows to `presented` after successful card upsert. Re-running refresh keeps cards in
 sync with the latest scored queue data and preserves future compatibility for one-sided/mutual interest flow.
+
+## Mutual-interest flow (v1)
+Viewer actions on anonymous cards:
+- `interested`
+- `pass`
+- `undo`
+
+Each action:
+1. appends an immutable row in `match_interest_actions`
+2. upserts current state in `match_interest_states` for `(match_id, user_id)`
+
+### Lifecycle choice
+- Initial match status: `suggested`
+- When both sides become `interested`:
+  - set `matches.status = mutual`
+  - ensure a `chats` row exists for the match
+  - set `matches.status = chat_open`
+
+This keeps a clear transition point while opening chat immediately when mutual is confirmed.
+
+### Pass and undo behavior
+- `pass` updates the current state to `passed` (history retained in actions log)
+- Cards with viewer current state `passed` are excluded from normal delivery
+- `undo` sets current state back to `none`, allowing the card to be delivered again
+
+## Mutual-interest verification fixture
+Run:
+
+```bash
+php bin/verify_mutual_interest_flow.php
+```
+
+It verifies:
+- interested action persistence
+- pass action persistence
+- undo action persistence and state reset
+- mutual detection across both users
+- chat creation on mutual
+- passed-card exclusion from active delivery
