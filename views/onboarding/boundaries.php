@@ -8,7 +8,7 @@
 <label><?= htmlspecialchars(t('onboarding.boundary_key'), ENT_QUOTES, 'UTF-8') ?><input name="boundary_key[]"></label>
 <label><?= htmlspecialchars(t('onboarding.boundary_value'), ENT_QUOTES, 'UTF-8') ?><input name="boundary_value[]"></label>
 <label><?= htmlspecialchars(t('onboarding.boundary_importance'), ENT_QUOTES, 'UTF-8') ?>
-<select name="importance[]"><option value="required">required</option><option value="preferred">preferred</option><option value="avoid">avoid</option></select>
+<select name="importance[]"><option value="required"><?= htmlspecialchars(t('onboarding.importance.required'), ENT_QUOTES, 'UTF-8') ?></option><option value="preferred"><?= htmlspecialchars(t('onboarding.importance.preferred'), ENT_QUOTES, 'UTF-8') ?></option><option value="avoid"><?= htmlspecialchars(t('onboarding.importance.avoid'), ENT_QUOTES, 'UTF-8') ?></option></select>
 </label>
 </div>
 <?php endfor; ?>

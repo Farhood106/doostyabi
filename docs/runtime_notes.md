@@ -13,3 +13,7 @@
 - Helpers `currentLocale()` and `currentDirection()` read session runtime state.
 - Main layout applies `<html lang="..." dir="...">` using those helpers.
 - `config/app.php` defaults locale to `fa`; app defaults direction to `rtl` when no user session exists.
+
+## Main-flow i18n seed patch (shared-hosting deployments)
+
+- Base schema includes minimal bilingual examples; run `database/i18n_seed_main_flow.sql` after schema import to upsert complete Persian+English keys used in auth/onboarding/dashboard/match/chat/reveal/validation/common flows.

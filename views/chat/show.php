@@ -21,7 +21,7 @@
         <button class="btn" type="submit" <?= empty($revealPanel['available_request_types'] ?? []) ? 'disabled' : '' ?>><?= htmlspecialchars(t('reveal.request_submit'), ENT_QUOTES, 'UTF-8') ?></button>
     </form>
     <?php if (empty($revealPanel['available_request_types'] ?? [])): ?>
-        <small><?= htmlspecialchars(t('reveal.none_available') !== 'reveal.none_available' ? t('reveal.none_available') : 'No reveal type currently available.', ENT_QUOTES, 'UTF-8') ?></small>
+        <small><?= htmlspecialchars(t('reveal.none_available'), ENT_QUOTES, 'UTF-8') ?></small>
     <?php endif; ?>
 </div>
 
