@@ -18,7 +18,7 @@
    - Enables better distance/proximity heuristics without storing exact coordinates.
 
 4. **Made `no_match_states` active-state uniqueness explicit**
-   - Added `is_active` and generated `goal_scope_key`.
+   - Added `is_active` and stored `goal_scope_key` (application-maintained).
    - Added unique key `uq_no_match_active_scope (user_id, goal_scope_key, is_active)` to avoid ambiguous current state.
 
 5. **Enforced one closure feedback per user per match**
@@ -102,7 +102,7 @@
   - added: `template_id` FK to `notification_templates`, `payload_json`
 
 #### `no_match_states`
-- Added: `goal_scope_key` (generated), `is_active`
+- Added: `goal_scope_key` (stored, app-maintained), `is_active`
 - Added unique active-scope constraint: `uq_no_match_active_scope`
 
 #### `closure_feedback`

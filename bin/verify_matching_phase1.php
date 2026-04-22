@@ -71,7 +71,7 @@ function createRepo(): array
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
         goal_id INTEGER,
-        goal_scope_key INTEGER GENERATED ALWAYS AS (COALESCE(goal_id, 0)) STORED,
+        goal_scope_key INTEGER NOT NULL DEFAULT 0,
         state TEXT,
         context_json TEXT,
         is_active INTEGER,
@@ -206,7 +206,7 @@ function testNoMatchLifecycle(): void
     seedUser($pdo, 1, ['goals' => [1], 'about_me' => 'x', 'looking_for' => 'y']);
     seedUser($pdo, 2, ['goals' => [1], 'about_me' => 'x', 'looking_for' => 'y']);
 
-    $pdo->prepare('INSERT INTO no_match_states (user_id, goal_id, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at) VALUES (1, 1, ?, ?, 1, ?, 1, ?, ?)')
+    $pdo->prepare('INSERT INTO no_match_states (user_id, goal_id, goal_scope_key, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at) VALUES (1, 1, 1, ?, ?, 1, ?, 1, ?, ?)')
         ->execute(['expand_preferences_suggested', '{}', date('Y-m-d H:i:s'), date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]);
 
     $generator = new CandidateGenerationService(

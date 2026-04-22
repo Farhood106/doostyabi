@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Core\App;
+use App\I18n\Translator;
 
 function app(): App
 {
@@ -11,7 +12,7 @@ function app(): App
 
 function t(string $key, array $replace = []): string
 {
-    return app()->make(App\I18n\Translator::class)->get(currentLocale(), $key, $replace);
+    return app()->make(Translator::class)->get(currentLocale(), $key, $replace);
 }
 
 function currentLocale(): string

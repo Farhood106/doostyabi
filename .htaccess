@@ -1,0 +1,30 @@
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php81” package as the default “PHP” programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php81 .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit
+
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Do not expose non-public application paths/files.
+RewriteRule ^(bootstrap|config|database|docs|routes|src|views|bin)(/|$) - [F,L]
+RewriteRule ^(\.git|composer\.(json|lock)|README|LICENSE) - [F,L]
+
+# Serve existing root files/directories directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Serve real files from /public without forcing /public in URL.
+RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -d
+RewriteRule ^(.*)$ public/$1 [L]
+
+# Everything else enters the front controller.
+RewriteRule ^ public/index.php [L,QSA]
+</IfModule>

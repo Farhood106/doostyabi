@@ -203,28 +203,30 @@ final class CandidateRepository
 
     public function deactivateActiveNoMatchStates(int $userId, ?int $goalId): void
     {
+        $goalScope = $goalId ?? 0;
         $stmt = $this->pdo->prepare(
             "UPDATE no_match_states
              SET is_active = 0, updated_at = :updated
              WHERE user_id = :uid
-               AND goal_scope_key = COALESCE(:goal, 0)
+               AND goal_scope_key = :goal_scope
                AND is_active = 1"
         );
-        $stmt->execute(['uid' => $userId, 'goal' => $goalId, 'updated' => $this->now()]);
+        $stmt->execute(['uid' => $userId, 'goal_scope' => $goalScope, 'updated' => $this->now()]);
     }
 
     public function insertNoMatchState(int $userId, ?int $goalId, string $state, array $context): void
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO no_match_states
-                (user_id, goal_id, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at)
+                (user_id, goal_id, goal_scope_key, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at)
              VALUES
-                (:uid, :goal, :state, :context, 1, :next_recheck, 1, :created, :updated)"
+                (:uid, :goal, :goal_scope, :state, :context, 1, :next_recheck, 1, :created, :updated)"
         );
         $now = $this->now();
         $stmt->execute([
             'uid' => $userId,
             'goal' => $goalId,
+            'goal_scope' => $goalId ?? 0,
             'state' => $state,
             'context' => json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'next_recheck' => date('Y-m-d H:i:s', strtotime($now . ' +1 day')),

@@ -507,7 +507,7 @@ CREATE TABLE no_match_states (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
   goal_id SMALLINT UNSIGNED NULL,
-  goal_scope_key SMALLINT UNSIGNED AS (COALESCE(goal_id, 0)) STORED,
+  goal_scope_key SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   state ENUM('searching','expand_preferences_suggested','profile_improvement_suggested','notified_waiting') NOT NULL DEFAULT 'searching',
   context_json JSON NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
