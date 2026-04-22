@@ -7,6 +7,7 @@ use App\Controllers\ChatController;
 use App\Controllers\DashboardController;
 use App\Controllers\MatchInterestController;
 use App\Controllers\OnboardingController;
+use App\Controllers\RevealController;
 
 $router->get('/', [AuthController::class, 'showLogin'], [$guestMiddleware]);
 
@@ -21,6 +22,9 @@ $router->post('/match-interest', [MatchInterestController::class, 'store'], [$au
 $router->get('/chat', [ChatController::class, 'show'], [$authMiddleware]);
 $router->post('/chat/send', [ChatController::class, 'send'], [$authMiddleware]);
 $router->get('/chat/poll', [ChatController::class, 'poll']);
+$router->post('/reveal/request', [RevealController::class, 'create'], [$authMiddleware]);
+$router->post('/reveal/respond', [RevealController::class, 'respond'], [$authMiddleware]);
+$router->post('/reveal/cancel', [RevealController::class, 'cancel'], [$authMiddleware]);
 
 $router->get('/onboarding/profile', [OnboardingController::class, 'showProfile'], [$authMiddleware]);
 $router->post('/onboarding/profile', [OnboardingController::class, 'saveProfile'], [$authMiddleware]);

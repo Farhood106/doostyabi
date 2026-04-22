@@ -10,8 +10,10 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Repositories\ChatRepository;
+use App\Repositories\RevealRepository;
 use App\Security\Csrf;
 use App\Services\ChatService;
+use App\Services\RevealService;
 use InvalidArgumentException;
 use PDO;
 
@@ -32,7 +34,9 @@ final class ChatController
         try {
             $service = new ChatService(new ChatRepository($this->app->make(PDO::class)));
             $chat = $service->openContext($userId, $chatId, $matchId);
-            View::render('chat/show', ['chat' => $chat, 'message' => flashGet('message')]);
+            $revealPanel = (new RevealService(new RevealRepository($this->app->make(PDO::class))))
+                ->panel((int)$chat['match_id'], $userId);
+            View::render('chat/show', ['chat' => $chat, 'revealPanel' => $revealPanel, 'message' => flashGet('message')]);
         } catch (InvalidArgumentException) {
             flash('message', 'chat.access_denied');
             Response::redirect('/dashboard');

@@ -241,3 +241,53 @@ It verifies:
 - send message success
 - send message blocked for non-participants
 - polling returns only relevant/new messages
+
+## Progressive reveal flow (v1)
+### Request lifecycle
+Supported reveal types:
+- `first_name`
+- `photo`
+- `contact_info`
+- `deep_profile`
+
+Lifecycle states:
+1. `pending` (request created)
+2. `accepted` (counterparty accepts)
+3. `declined` (counterparty declines)
+4. `cancelled` (requester cancels while pending)
+5. `expired` (pending request past `expires_at`)
+
+### Two-sided consent model
+- Request creation auto-records requester consent = `accepted`.
+- Counterparty must explicitly `accept` in `reveal_consents`.
+- Data is visible only when:
+  - request status is `accepted`
+  - requester consent is `accepted`
+  - counterparty consent is `accepted`
+
+### Stage-aware enforcement
+- Reveal type is gated by the owner’s stage requirement columns on `revealable_profile_data`.
+- Current stage is derived from match status (`suggested`/`interested_one_side` => stage_1, `mutual` => stage_2, `chat_open` => stage_3).
+- Requests exceeding current stage are blocked server-side.
+
+### Chat integration
+- Chat page includes:
+  - create reveal request form
+  - incoming pending requests with accept/decline
+  - outgoing pending requests with cancel
+  - unlocked reveal values section (only truly unlocked items)
+
+## Reveal verification fixture
+Run:
+
+```bash
+php bin/verify_reveal_flow.php
+```
+
+It verifies:
+- request creation
+- accept flow
+- decline flow
+- hidden until unlocked
+- visible after proper consent
+- unauthorized access blocked
