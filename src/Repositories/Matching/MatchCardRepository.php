@@ -218,6 +218,7 @@ final class MatchCardRepository
                     mc.age_range_label_key, mc.approx_distance_bucket, mc.compatibility_score,
                     mc.emotional_summary_key, mc.match_reasons_json, mc.communication_boundaries_json,
                     mc.schedule_overlap_key, mc.card_version, mc.updated_at,
+                    m.status AS match_status,
                     COALESCE(mis.current_interest, 'none') AS viewer_interest
              FROM match_cards mc
              JOIN matches m ON m.id = mc.match_id

@@ -44,8 +44,14 @@ final class MatchInterestController
             } else {
                 flash('message', 'match.interest.action_saved');
             }
-        } catch (InvalidArgumentException) {
-            flash('message', 'match.interest.invalid_action');
+        } catch (InvalidArgumentException $e) {
+            $messageKey = match ($e->getMessage()) {
+                'invalid_action' => 'match.interest.invalid_action',
+                'match_not_found' => 'match.interest.match_not_found',
+                'forbidden_actor' => 'match.interest.forbidden_actor',
+                default => 'match.interest.invalid_action',
+            };
+            flash('message', $messageKey);
         } catch (\Throwable) {
             flash('message', 'common.unexpected_error');
         }

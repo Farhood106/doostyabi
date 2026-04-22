@@ -19,11 +19,12 @@ final class DashboardController
     {
         $userId = (int)($this->app->make(AuthService::class)->userId() ?? 0);
         $cards = [];
+        $message = flashGet('message');
         if ($userId > 0) {
             $repo = new MatchCardRepository($this->app->make(PDO::class));
             $cards = (new MatchDeliveryService($repo))->cardsForViewer($userId, 20, 0);
         }
 
-        View::render('dashboard', ['cards' => $cards]);
+        View::render('dashboard', ['cards' => $cards, 'message' => $message]);
     }
 }
