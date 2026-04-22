@@ -14,13 +14,15 @@
         <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
         <input type="hidden" name="match_id" value="<?= (int)$chat['match_id'] ?>">
         <select name="reveal_type">
-            <option value="first_name"><?= htmlspecialchars(t('reveal.type.first_name'), ENT_QUOTES, 'UTF-8') ?></option>
-            <option value="photo"><?= htmlspecialchars(t('reveal.type.photo'), ENT_QUOTES, 'UTF-8') ?></option>
-            <option value="contact_info"><?= htmlspecialchars(t('reveal.type.contact_info'), ENT_QUOTES, 'UTF-8') ?></option>
-            <option value="deep_profile"><?= htmlspecialchars(t('reveal.type.deep_profile'), ENT_QUOTES, 'UTF-8') ?></option>
+            <?php foreach (($revealPanel['available_request_types'] ?? []) as $type): ?>
+                <option value="<?= htmlspecialchars((string)$type, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('reveal.type.' . (string)$type), ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
         </select>
-        <button class="btn" type="submit"><?= htmlspecialchars(t('reveal.request_submit'), ENT_QUOTES, 'UTF-8') ?></button>
+        <button class="btn" type="submit" <?= empty($revealPanel['available_request_types'] ?? []) ? 'disabled' : '' ?>><?= htmlspecialchars(t('reveal.request_submit'), ENT_QUOTES, 'UTF-8') ?></button>
     </form>
+    <?php if (empty($revealPanel['available_request_types'] ?? [])): ?>
+        <small><?= htmlspecialchars(t('reveal.none_available') !== 'reveal.none_available' ? t('reveal.none_available') : 'No reveal type currently available.', ENT_QUOTES, 'UTF-8') ?></small>
+    <?php endif; ?>
 </div>
 
 <?php if (!empty($revealPanel['pending_incoming'] ?? [])): ?>
@@ -64,7 +66,28 @@
         <?php foreach ($revealPanel['unlocked'] as $item): ?>
             <li>
                 <strong><?= htmlspecialchars(t('reveal.type.' . (string)$item['reveal_type']), ENT_QUOTES, 'UTF-8') ?>:</strong>
-                <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                <?php $type = (string)$item['reveal_type']; ?>
+                <?php if ($type === 'first_name'): ?>
+                    <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                <?php elseif ($type === 'photo'): ?>
+                    <?php $photo = trim((string)$item['value']); ?>
+                    <?php if ($photo !== ''): ?>
+                        <img src="<?= htmlspecialchars($photo, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars(t('reveal.type.photo'), ENT_QUOTES, 'UTF-8') ?>" style="max-width:220px;max-height:220px;object-fit:cover;">
+                    <?php endif; ?>
+                <?php elseif ($type === 'contact_info' || $type === 'deep_profile'): ?>
+                    <?php $decoded = json_decode((string)$item['value'], true); ?>
+                    <?php if (is_array($decoded)): ?>
+                        <ul>
+                            <?php foreach ($decoded as $k => $v): ?>
+                                <li><strong><?= htmlspecialchars((string)$k, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= htmlspecialchars(is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                <?php endif; ?>
             </li>
         <?php endforeach; ?>
     </ul>

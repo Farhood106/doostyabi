@@ -58,6 +58,7 @@ final class RevealService
             'pending_incoming' => $this->repo->pendingRequestsForResponder($matchId, $userId),
             'pending_outgoing' => $this->repo->myPendingRequests($matchId, $userId),
             'unlocked' => $unlocked,
+            'available_request_types' => $this->availableRequestTypes((int)$match['id'], $userId),
         ];
     }
 
@@ -67,6 +68,8 @@ final class RevealService
         if (!$match) {
             throw new InvalidArgumentException('forbidden_match');
         }
+
+        $this->repo->expirePendingForMatch($matchId);
 
         if (!isset(self::TYPE_TO_STAGE_FIELD[$revealType])) {
             throw new InvalidArgumentException('invalid_reveal_type');
@@ -88,6 +91,11 @@ final class RevealService
             throw new InvalidArgumentException('reveal_value_missing');
         }
 
+        $existingPending = $this->repo->pendingRequestByRequesterAndType($matchId, $requesterUserId, $revealType);
+        if ($existingPending) {
+            throw new InvalidArgumentException('duplicate_pending_request');
+        }
+
         $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
         $requestId = $this->repo->createRequest($matchId, $requesterUserId, $revealType, $stageRequired, $expiresAt);
         $this->repo->upsertConsent($requestId, $requesterUserId, 'accepted');
@@ -97,7 +105,7 @@ final class RevealService
 
     public function respond(int $requestId, int $actorUserId, string $decision): void
     {
-        $req = $this->repo->requestById($requestId);
+        $req = $this->normalizedRequest($requestId);
         if (!$req || ($req['status'] ?? '') !== 'pending') {
             throw new InvalidArgumentException('request_not_pending');
         }
@@ -128,7 +136,7 @@ final class RevealService
 
     public function cancel(int $requestId, int $actorUserId): void
     {
-        $req = $this->repo->requestById($requestId);
+        $req = $this->normalizedRequest($requestId);
         if (!$req || ($req['status'] ?? '') !== 'pending') {
             throw new InvalidArgumentException('request_not_pending');
         }
@@ -150,5 +158,64 @@ final class RevealService
         };
 
         return ($stageRank[$currentStage] ?? 0) >= ($stageRank[$requiredStage] ?? 99);
+    }
+
+    private function availableRequestTypes(int $matchId, int $requesterUserId): array
+    {
+        $match = $this->repo->matchForUser($matchId, $requesterUserId);
+        if (!$match) {
+            return [];
+        }
+
+        $data = $this->repo->revealableData($requesterUserId);
+        if (!$data) {
+            return [];
+        }
+
+        $allowed = [];
+        foreach (self::TYPE_TO_STAGE_FIELD as $type => $stageField) {
+            $requiredStage = (string)($data[$stageField] ?? '');
+            $valueField = self::TYPE_TO_VALUE_FIELD[$type] ?? null;
+            if (!$valueField) {
+                continue;
+            }
+            if (empty($data[$valueField])) {
+                continue;
+            }
+            if ($requiredStage === '' || !$this->isStageAllowed((string)$match['status'], $requiredStage)) {
+                continue;
+            }
+            $allowed[] = $type;
+        }
+
+        return $allowed;
+    }
+
+    private function normalizedRequest(int $requestId): ?array
+    {
+        $req = $this->repo->requestById($requestId);
+        if (!$req) {
+            return null;
+        }
+
+        if (($req['status'] ?? '') === 'pending' && $this->isExpired($req['expires_at'] ?? null)) {
+            $this->repo->updateRequestStatus($requestId, 'expired');
+            $req['status'] = 'expired';
+        }
+
+        return $req;
+    }
+
+    private function isExpired(mixed $expiresAt): bool
+    {
+        $value = trim((string)$expiresAt);
+        if ($value === '') {
+            return false;
+        }
+        $ts = strtotime($value);
+        if ($ts === false) {
+            return false;
+        }
+        return $ts < time();
     }
 }

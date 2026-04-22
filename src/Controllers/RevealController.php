@@ -20,6 +20,10 @@ final class RevealController
 
     public function create(Request $request): never
     {
+        if ($this->authUserId() <= 0) {
+            Response::redirect('/login');
+        }
+
         if (!$this->csrfOk($request)) {
             flash('message', 'security.invalid_csrf');
             Response::redirect('/dashboard');
@@ -44,6 +48,10 @@ final class RevealController
 
     public function respond(Request $request): never
     {
+        if ($this->authUserId() <= 0) {
+            Response::redirect('/login');
+        }
+
         if (!$this->csrfOk($request)) {
             flash('message', 'security.invalid_csrf');
             Response::redirect('/dashboard');
@@ -68,6 +76,10 @@ final class RevealController
 
     public function cancel(Request $request): never
     {
+        if ($this->authUserId() <= 0) {
+            Response::redirect('/login');
+        }
+
         if (!$this->csrfOk($request)) {
             flash('message', 'security.invalid_csrf');
             Response::redirect('/dashboard');

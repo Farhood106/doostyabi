@@ -59,6 +59,15 @@ $service = new RevealService(new RevealRepository($pdo));
 $requestId = $service->createRequest(10, 1, 'first_name');
 assertReveal($requestId > 0, 'request should be created');
 
+// duplicate pending should be blocked
+$duplicateBlocked = false;
+try {
+    $service->createRequest(10, 1, 'first_name');
+} catch (InvalidArgumentException $e) {
+    $duplicateBlocked = $e->getMessage() === 'duplicate_pending_request';
+}
+assertReveal($duplicateBlocked, 'duplicate pending request should be blocked');
+
 // hidden until unlocked
 $panelBefore = $service->panel(10, 2);
 assertReveal(count($panelBefore['unlocked']) === 0, 'revealed data should be hidden before two-sided consent');
@@ -73,6 +82,27 @@ $requestDecline = $service->createRequest(10, 1, 'photo');
 $service->respond($requestDecline, 2, 'decline');
 $declined = (string)$pdo->query("SELECT status FROM reveal_requests WHERE id = {$requestDecline}")->fetchColumn();
 assertReveal($declined === 'declined', 'decline flow should set declined status');
+
+// expired pending request should not accept/decline/cancel
+$requestExpired = $service->createRequest(10, 1, 'contact_info');
+$pdo->exec("UPDATE reveal_requests SET expires_at = '2000-01-01 00:00:00' WHERE id = {$requestExpired}");
+$expiredRespondBlocked = false;
+try {
+    $service->respond($requestExpired, 2, 'accept');
+} catch (InvalidArgumentException $e) {
+    $expiredRespondBlocked = $e->getMessage() === 'request_not_pending';
+}
+assertReveal($expiredRespondBlocked, 'expired request should not be respondable');
+
+$requestExpired2 = $service->createRequest(10, 1, 'contact_info');
+$pdo->exec("UPDATE reveal_requests SET expires_at = '2000-01-01 00:00:00' WHERE id = {$requestExpired2}");
+$expiredCancelBlocked = false;
+try {
+    $service->cancel($requestExpired2, 1);
+} catch (InvalidArgumentException $e) {
+    $expiredCancelBlocked = $e->getMessage() === 'request_not_pending';
+}
+assertReveal($expiredCancelBlocked, 'expired request should not be cancellable');
 
 // unauthorized access blocked
 $blocked = false;

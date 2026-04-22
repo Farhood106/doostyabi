@@ -45,6 +45,27 @@ final class RevealRepository
         return (int)$this->pdo->lastInsertId();
     }
 
+    public function pendingRequestByRequesterAndType(int $matchId, int $requesterUserId, string $revealType): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM reveal_requests
+             WHERE match_id = :match_id
+               AND requested_by_user_id = :uid
+               AND reveal_type = :reveal_type
+               AND status = :status
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'match_id' => $matchId,
+            'uid' => $requesterUserId,
+            'reveal_type' => $revealType,
+            'status' => 'pending',
+        ]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public function upsertConsent(int $requestId, int $userId, string $consentStatus): void
     {
         $sql = 'INSERT INTO reveal_consents (reveal_request_id, user_id, consent_status, consented_at)

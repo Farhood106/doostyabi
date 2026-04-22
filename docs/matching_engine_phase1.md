@@ -264,6 +264,8 @@ Lifecycle states:
   - request status is `accepted`
   - requester consent is `accepted`
   - counterparty consent is `accepted`
+- Duplicate pending requests (same requester + match + reveal_type) are blocked.
+- `respond` / `cancel` normalize expiration first; expired pending requests are not actionable.
 
 ### Stage-aware enforcement
 - Reveal type is gated by the owner’s stage requirement columns on `revealable_profile_data`.
