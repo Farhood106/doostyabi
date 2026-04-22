@@ -20,7 +20,7 @@ $router->get('/dashboard', [DashboardController::class, 'index'], [$authMiddlewa
 $router->post('/match-interest', [MatchInterestController::class, 'store'], [$authMiddleware]);
 $router->get('/chat', [ChatController::class, 'show'], [$authMiddleware]);
 $router->post('/chat/send', [ChatController::class, 'send'], [$authMiddleware]);
-$router->get('/chat/poll', [ChatController::class, 'poll'], [$authMiddleware]);
+$router->get('/chat/poll', [ChatController::class, 'poll']);
 
 $router->get('/onboarding/profile', [OnboardingController::class, 'showProfile'], [$authMiddleware]);
 $router->post('/onboarding/profile', [OnboardingController::class, 'saveProfile'], [$authMiddleware]);

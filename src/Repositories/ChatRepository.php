@@ -50,6 +50,8 @@ final class ChatRepository
             "SELECT id, chat_id, sender_user_id, message_body, message_type, created_at
              FROM messages
              WHERE chat_id = :chat_id
+               AND deleted_at IS NULL
+               AND moderation_state <> 'hidden'
              ORDER BY id DESC
              LIMIT :limit"
         );
@@ -67,6 +69,8 @@ final class ChatRepository
              FROM messages
              WHERE chat_id = :chat_id
                AND id > :since_id
+               AND deleted_at IS NULL
+               AND moderation_state <> 'hidden'
              ORDER BY id ASC
              LIMIT :limit"
         );

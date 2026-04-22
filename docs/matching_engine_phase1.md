@@ -211,11 +211,13 @@ It verifies:
 - `POST /chat/send` inserts a `messages` row with `message_type='text'`.
 - Allowed only for chat participants and only while chat status is `open`.
 - Message body is validated (non-empty, max length).
+- Hidden/deleted messages are excluded from reader queries.
 
 ### Polling design
 - `GET /chat/poll?chat_id=<id>&since_id=<message_id>`
 - Returns only messages for that specific accessible chat and only `id > since_id`.
 - Lightweight AJAX polling (`setInterval`) keeps shared-hosting compatibility.
+- When session is missing/expired, polling returns JSON `401` (`unauthorized`) instead of redirect HTML.
 
 ### Intentional omissions (privacy/safety MVP scope)
 - no seen/read receipts

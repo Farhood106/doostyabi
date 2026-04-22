@@ -2,6 +2,9 @@
 <?php $csrf = app()->make(App\Security\Csrf::class); ?>
 <h2><?= htmlspecialchars(t('chat.title'), ENT_QUOTES, 'UTF-8') ?></h2>
 <p><?= htmlspecialchars(t('chat.privacy_note'), ENT_QUOTES, 'UTF-8') ?></p>
+<?php if (!empty($message ?? null)): ?>
+    <div class="ok"><?= htmlspecialchars(t((string)$message), ENT_QUOTES, 'UTF-8') ?></div>
+<?php endif; ?>
 
 <div id="messages" style="border:1px solid #ddd;padding:12px;max-height:400px;overflow:auto;">
     <?php foreach (($chat['messages'] ?? []) as $m): ?>
@@ -46,7 +49,7 @@
         div.setAttribute('data-id', String(m.id));
         div.style.marginBottom = '10px';
         const small = document.createElement('small');
-        small.textContent = `${m.created_at} | ${m.message_type}`;
+        small.textContent = `${m.created_at} | ${m.message_type_label || m.message_type}`;
         const body = document.createElement('div');
         body.textContent = m.message_body;
         div.appendChild(small);

@@ -56,12 +56,19 @@ $pdo->exec("INSERT INTO chats (id, match_id, status, opened_at) VALUES (100,10,'
 $pdo->exec("INSERT INTO messages (chat_id, sender_user_id, message_body, message_type, moderation_state, created_at) VALUES
             (100,1,'hello one','text','clean',datetime('now')),
             (100,2,'hello two','prompt','clean',datetime('now'))");
+$pdo->exec("INSERT INTO messages (chat_id, sender_user_id, message_body, message_type, moderation_state, created_at, deleted_at) VALUES
+            (100,1,'hidden msg','text','hidden',datetime('now'),NULL),
+            (100,2,'deleted msg','text','clean',datetime('now'),datetime('now'))");
 
 $service = new ChatService(new ChatRepository($pdo));
 
 // authorized chat access
 $ctx = $service->openContext(1, 100, null);
 assertChat((int)$ctx['chat_id'] === 100, 'authorized participant should access chat');
+foreach ($ctx['messages'] as $m) {
+    assertChat((string)$m['message_body'] !== 'hidden msg', 'hidden messages must be excluded');
+    assertChat((string)$m['message_body'] !== 'deleted msg', 'deleted messages must be excluded');
+}
 
 // unauthorized chat access blocked
 $blocked = false;

@@ -32,7 +32,7 @@ final class ChatController
         try {
             $service = new ChatService(new ChatRepository($this->app->make(PDO::class)));
             $chat = $service->openContext($userId, $chatId, $matchId);
-            View::render('chat/show', ['chat' => $chat]);
+            View::render('chat/show', ['chat' => $chat, 'message' => flashGet('message')]);
         } catch (InvalidArgumentException) {
             flash('message', 'chat.access_denied');
             Response::redirect('/dashboard');
@@ -85,6 +85,10 @@ final class ChatController
         try {
             $service = new ChatService(new ChatRepository($this->app->make(PDO::class)));
             $messages = $service->poll($userId, $chatId, $sinceId);
+            foreach ($messages as &$m) {
+                $typeKey = 'chat.message_type.' . (string)($m['message_type'] ?? 'text');
+                $m['message_type_label'] = t($typeKey);
+            }
             $this->json(['messages' => $messages]);
         } catch (InvalidArgumentException) {
             $this->json(['error' => 'forbidden'], 403);
