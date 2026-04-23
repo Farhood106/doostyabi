@@ -18,11 +18,44 @@ use Throwable;
 
 final class OnboardingController
 {
+    private const IRAN_LOCATIONS = [
+        'tehran' => ['fa' => 'تهران', 'en' => 'Tehran', 'cities' => [
+            'tehran' => ['fa' => 'تهران', 'en' => 'Tehran'],
+            'karaj' => ['fa' => 'کرج', 'en' => 'Karaj'],
+            'shemiran' => ['fa' => 'شمیرانات', 'en' => 'Shemiranat'],
+        ]],
+        'isfahan' => ['fa' => 'اصفهان', 'en' => 'Isfahan', 'cities' => [
+            'isfahan' => ['fa' => 'اصفهان', 'en' => 'Isfahan'],
+            'kashan' => ['fa' => 'کاشان', 'en' => 'Kashan'],
+            'najafabad' => ['fa' => 'نجف‌آباد', 'en' => 'Najafabad'],
+        ]],
+        'fars' => ['fa' => 'فارس', 'en' => 'Fars', 'cities' => [
+            'shiraz' => ['fa' => 'شیراز', 'en' => 'Shiraz'],
+            'marvdasht' => ['fa' => 'مرودشت', 'en' => 'Marvdasht'],
+            'jahrom' => ['fa' => 'جهرم', 'en' => 'Jahrom'],
+        ]],
+        'khorasan_razavi' => ['fa' => 'خراسان رضوی', 'en' => 'Khorasan Razavi', 'cities' => [
+            'mashhad' => ['fa' => 'مشهد', 'en' => 'Mashhad'],
+            'neyshabur' => ['fa' => 'نیشابور', 'en' => 'Neyshabur'],
+            'sabzevar' => ['fa' => 'سبزوار', 'en' => 'Sabzevar'],
+        ]],
+        'east_azerbaijan' => ['fa' => 'آذربایجان شرقی', 'en' => 'East Azerbaijan', 'cities' => [
+            'tabriz' => ['fa' => 'تبریز', 'en' => 'Tabriz'],
+            'maragheh' => ['fa' => 'مراغه', 'en' => 'Maragheh'],
+            'marand' => ['fa' => 'مرند', 'en' => 'Marand'],
+        ]],
+        'khuzestan' => ['fa' => 'خوزستان', 'en' => 'Khuzestan', 'cities' => [
+            'ahvaz' => ['fa' => 'اهواز', 'en' => 'Ahvaz'],
+            'abadan' => ['fa' => 'آبادان', 'en' => 'Abadan'],
+            'dezful' => ['fa' => 'دزفول', 'en' => 'Dezful'],
+        ]],
+    ];
+
     public function __construct(private readonly App $app) {}
 
     public function showProfile(Request $request): void
     {
-        View::render('onboarding/profile', $this->viewData());
+        View::render('onboarding/profile', $this->profileViewData());
     }
 
     public function saveProfile(Request $request): never
@@ -44,12 +77,15 @@ final class OnboardingController
             'independence_level' => (string)$request->input('independence_level'),
             'boundary_sensitivity' => (string)$request->input('boundary_sensitivity'),
             'structure_vs_spontaneity' => (string)$request->input('structure_vs_spontaneity'),
-            'country_code' => strtoupper((string)$request->input('country_code')),
-            'region_code' => (string)$request->input('region_code'),
-            'location_cell_l5' => (string)$request->input('location_cell_l5'),
-            'location_cell_l4' => (string)$request->input('location_cell_l4'),
+            'smoking_preference' => (string)$request->input('smoking_preference'),
+            'drinking_preference' => (string)$request->input('drinking_preference'),
+            'activity_level' => (string)$request->input('activity_level'),
+            'province' => (string)$request->input('province'),
+            'city' => (string)$request->input('city'),
             'distance_radius_km' => (string)$request->input('distance_radius_km', '30'),
         ];
+
+        $data += $this->deriveInternalLocation($data['province'], $data['city']);
 
         $_SESSION['_old'] = $data;
         $errors = $this->validateProfile($data);
@@ -247,10 +283,14 @@ final class OnboardingController
             'age_min_pref' => 'required|int',
             'age_max_pref' => 'required|int',
             'distance_radius_km' => 'required|int',
-            'country_code' => 'required|max:2',
-            'region_code' => 'required|max:32',
-            'location_cell_l5' => 'required|max:16',
-            'location_cell_l4' => 'required|max:16',
+            'province' => 'required|max:40',
+            'city' => 'required|max:40',
+            'social_energy' => 'required|int',
+            'communication_style' => 'required|int',
+            'emotional_openness' => 'required|int',
+            'relationship_pace' => 'required|int',
+            'boundary_sensitivity' => 'required|int',
+            'activity_level' => 'required|max:20',
         ]);
 
         $errors = $v->errors();
@@ -272,16 +312,31 @@ final class OnboardingController
             $errors['distance_radius_km'][] = 'validation.radius_range';
         }
 
-        if (!preg_match('/^[A-Z]{2}$/', $data['country_code'])) {
-            $errors['country_code'][] = 'validation.country_code';
+        if (($data['country_code'] ?? '') !== 'IR') {
+            $errors['province'][] = 'validation.invalid_iran_location';
+        }
+
+        $province = (string)$data['province'];
+        $city = (string)$data['city'];
+        if (!$this->isValidIranLocation($province, $city)) {
+            $errors['city'][] = 'validation.invalid_iran_location';
         }
 
         foreach (['social_energy','communication_style','emotional_openness','relationship_pace','independence_level','boundary_sensitivity','structure_vs_spontaneity'] as $field) {
-            if ($data[$field] === '') continue;
             $value = (int)$data[$field];
             if ($value < 1 || $value > 5) {
                 $errors[$field][] = 'validation.dimension_range';
             }
+        }
+
+        if (!in_array((string)$data['activity_level'], ['low', 'moderate', 'high'], true)) {
+            $errors['activity_level'][] = 'validation.activity_level';
+        }
+        if (!in_array((string)$data['smoking_preference'], ['no', 'yes', 'occasionally', 'prefer_not'], true)) {
+            $errors['smoking_preference'][] = 'validation.preference_invalid';
+        }
+        if (!in_array((string)$data['drinking_preference'], ['no', 'yes', 'occasionally', 'prefer_not'], true)) {
+            $errors['drinking_preference'][] = 'validation.preference_invalid';
         }
 
         return $errors;
@@ -319,6 +374,63 @@ final class OnboardingController
             'errors' => flashGet('errors', []),
             'message' => flashGet('message'),
         ];
+    }
+
+    private function profileViewData(): array
+    {
+        $locale = currentLocale();
+        $selectedProvince = (string)old('province', 'tehran');
+        if (!isset(self::IRAN_LOCATIONS[$selectedProvince])) {
+            $selectedProvince = 'tehran';
+        }
+
+        $provinces = [];
+        foreach (self::IRAN_LOCATIONS as $slug => $row) {
+            $provinces[] = [
+                'value' => $slug,
+                'label' => $row[$locale] ?? $row['fa'],
+            ];
+        }
+
+        $cities = [];
+        foreach (self::IRAN_LOCATIONS[$selectedProvince]['cities'] as $slug => $row) {
+            $cities[] = [
+                'value' => $slug,
+                'label' => $row[$locale] ?? $row['fa'],
+            ];
+        }
+
+        return $this->viewData() + [
+            'provinces' => $provinces,
+            'cities' => $cities,
+        ];
+    }
+
+    private function deriveInternalLocation(string $province, string $city): array
+    {
+        $provinceKey = trim($province);
+        $cityKey = trim($city);
+
+        if (!$this->isValidIranLocation($provinceKey, $cityKey)) {
+            return [
+                'country_code' => 'IR',
+                'region_code' => '',
+                'location_cell_l5' => '',
+                'location_cell_l4' => '',
+            ];
+        }
+
+        return [
+            'country_code' => 'IR',
+            'region_code' => $provinceKey,
+            'location_cell_l5' => $cityKey,
+            'location_cell_l4' => $provinceKey,
+        ];
+    }
+
+    private function isValidIranLocation(string $province, string $city): bool
+    {
+        return isset(self::IRAN_LOCATIONS[$province], self::IRAN_LOCATIONS[$province]['cities'][$city]);
     }
 
     private function logException(Throwable $e, string $context): void

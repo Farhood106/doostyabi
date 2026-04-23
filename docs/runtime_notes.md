@@ -17,3 +17,12 @@
 ## Main-flow i18n seed patch (shared-hosting deployments)
 
 - Base schema includes minimal bilingual examples; run `database/i18n_seed_main_flow.sql` after schema import to upsert complete Persian+English keys used in auth/onboarding/dashboard/match/chat/reveal/validation/common flows.
+
+## Iran-only MVP onboarding location mapping
+
+- Profile form asks user for consumer-friendly `province` + `city` + `distance_radius_km`.
+- Backend derives internal matching fields and does not expose them directly:
+  - `country_code = IR`
+  - `region_code = province`
+  - `location_cell_l4 = province`
+  - `location_cell_l5 = city`
