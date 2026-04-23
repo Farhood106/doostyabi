@@ -105,7 +105,11 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.profile_saved');
-        Response::redirect('/onboarding/boundaries');
+        $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
+        if ($next === 'done') {
+            Response::redirect('/dashboard');
+        }
+        Response::redirect('/onboarding/' . $next);
     }
 
     public function showBoundaries(Request $request): void
@@ -372,7 +376,6 @@ final class OnboardingController
     {
         return [
             'errors' => flashGet('errors', []),
-            'message' => flashGet('message'),
         ];
     }
 
