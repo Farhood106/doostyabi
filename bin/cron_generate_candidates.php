@@ -13,17 +13,11 @@ use App\Services\Matching\HardFilterService;
 use App\Services\Matching\NoMatchStateService;
 
 require __DIR__ . '/../bootstrap/autoload.php';
-require __DIR__ . '/../src/Support/helpers.php';
 
 $config = [
     'app' => require __DIR__ . '/../config/app.php',
     'database' => require __DIR__ . '/../config/database.php',
 ];
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_name($config['app']['session_name']);
-    session_start();
-}
 
 $request = new Request('CLI', '/cron/candidates', [], [], []);
 $app = new App($config, $request);
@@ -42,11 +36,12 @@ $generator = new CandidateGenerationService(
 $limit = (int)($argv[1] ?? 50);
 $offset = (int)($argv[2] ?? 0);
 $candidateLimit = (int)($argv[3] ?? 200);
+$verbose = in_array('--verbose', $argv, true);
 
 $users = $repo->usersBatch($limit, $offset);
 
 foreach ($users as $row) {
-    $generator->processUser((int)$row['user_id'], $candidateLimit);
+    $generator->processUser((int)$row['user_id'], $candidateLimit, $verbose);
 }
 
-echo sprintf("processed_users=%d offset=%d limit=%d\n", count($users), $offset, $limit);
+echo sprintf("processed_users=%d offset=%d limit=%d candidate_limit=%d verbose=%s\n", count($users), $offset, $limit, $candidateLimit, $verbose ? '1' : '0');

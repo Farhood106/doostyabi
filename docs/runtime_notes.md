@@ -64,6 +64,10 @@
   - `php bin/cron_generate_candidates.php`
   - `php bin/cron_build_match_cards.php`
 - Until those run, dashboard can legitimately show no cards.
+- Cron scripts run in pure CLI mode and do **not** start PHP sessions.
+- Optional debug mode for candidate cron:
+  - `php bin/cron_generate_candidates.php 50 0 200 --verbose`
+  - prints user id, candidate ids, hard-filter decision, queue writes, and caught exceptions.
 
 ## No-match state uniqueness + cron safety (MySQL/MariaDB)
 

@@ -11,17 +11,11 @@ use App\Services\Matching\EmotionalSummaryBuilderService;
 use App\Services\Matching\MatchCardBuilderService;
 
 require __DIR__ . '/../bootstrap/autoload.php';
-require __DIR__ . '/../src/Support/helpers.php';
 
 $config = [
     'app' => require __DIR__ . '/../config/app.php',
     'database' => require __DIR__ . '/../config/database.php',
 ];
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_name($config['app']['session_name']);
-    session_start();
-}
 
 $app = new App($config, new Request('CLI', '/cron/build-match-cards', [], [], []));
 $GLOBALS['app'] = $app;

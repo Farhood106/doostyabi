@@ -142,11 +142,16 @@ final class CandidateRepository
     {
         $stmt = $this->pdo->prepare(
             "SELECT 1 FROM blocks
-             WHERE (blocker_user_id = :a AND blocked_user_id = :b)
-                OR (blocker_user_id = :b AND blocked_user_id = :a)
+             WHERE (blocker_user_id = :a1 AND blocked_user_id = :b1)
+                OR (blocker_user_id = :b2 AND blocked_user_id = :a2)
              LIMIT 1"
         );
-        $stmt->execute(['a' => $userA, 'b' => $userB]);
+        $stmt->execute([
+            'a1' => $userA,
+            'b1' => $userB,
+            'b2' => $userB,
+            'a2' => $userA,
+        ]);
         return (bool)$stmt->fetchColumn();
     }
 

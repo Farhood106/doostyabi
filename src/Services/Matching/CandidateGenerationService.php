@@ -18,14 +18,20 @@ final class CandidateGenerationService
         private readonly NoMatchStateService $noMatch,
     ) {}
 
-    public function processUser(int $userId, int $candidateLimit = 200): void
+    public function processUser(int $userId, int $candidateLimit = 200, bool $verbose = false): void
     {
         $source = $this->repo->userContext($userId);
         if (!$source || ($source['status'] ?? '') !== 'active') {
+            if ($verbose) {
+                echo sprintf("[candidate_generation] user=%d skipped=no_source_or_inactive\n", $userId);
+            }
             return;
         }
 
         $candidateIds = $this->stagedCandidateIds($source, $candidateLimit);
+        if ($verbose) {
+            echo sprintf("[candidate_generation] user=%d candidates=%s\n", $userId, json_encode($candidateIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
         $strong = 0;
         $primaryGoalId = $source['goals'][0] ?? null;
 
@@ -36,6 +42,16 @@ final class CandidateGenerationService
 
                 $hard = $this->hardFilter->evaluate($source, $candidate);
                 $goalOverlap = $hard['goal_overlap'];
+                if ($verbose) {
+                    echo sprintf(
+                        "[candidate_generation] user=%d candidate=%d hard_eligible=%s reasons=%s overlap_goals=%s\n",
+                        $userId,
+                        $candidateId,
+                        $hard['eligible_for_display'] ? '1' : '0',
+                        json_encode($hard['rejection_reason_codes'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        json_encode($goalOverlap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    );
+                }
 
                 if ($goalOverlap === [] && $primaryGoalId !== null) {
                     // keep rejection queue visibility under source primary goal
@@ -45,6 +61,9 @@ final class CandidateGenerationService
                 if (!$hard['eligible_for_display']) {
                     foreach ($goalOverlap as $goalId) {
                         $this->queue->writeRejected($userId, (int)$candidate['user_id'], (int)$goalId, $hard['rejection_reason_codes'][0]);
+                        if ($verbose) {
+                            echo sprintf("[candidate_generation] user=%d candidate=%d goal=%d queue_write=rejected\n", $userId, $candidateId, (int)$goalId);
+                        }
                     }
                     continue;
                 }
@@ -54,6 +73,9 @@ final class CandidateGenerationService
 
                 foreach ($goalOverlap as $goalId) {
                     $this->queue->writeScored($userId, (int)$candidate['user_id'], (int)$goalId, (float)$score['compatibility_score'], $explanation);
+                    if ($verbose) {
+                        echo sprintf("[candidate_generation] user=%d candidate=%d goal=%d queue_write=scored score=%.2f\n", $userId, $candidateId, (int)$goalId, (float)$score['compatibility_score']);
+                    }
                 }
 
                 if ((float)$score['compatibility_score'] >= 70.0) {
@@ -61,11 +83,17 @@ final class CandidateGenerationService
                 }
             } catch (Throwable $e) {
                 error_log(sprintf('[candidate_generation] %s user=%d candidate=%d msg=%s', $e::class, $userId, $candidateId, $e->getMessage()));
+                if ($verbose) {
+                    echo sprintf("[candidate_generation] exception=%s user=%d candidate=%d msg=%s\n", $e::class, $userId, $candidateId, $e->getMessage());
+                }
             }
         }
 
         $profileWeak = $this->isProfileWeak($source);
         $this->noMatch->update($userId, $primaryGoalId ? (int)$primaryGoalId : null, $strong, $profileWeak);
+        if ($verbose) {
+            echo sprintf("[candidate_generation] user=%d strong_candidates=%d profile_weak=%s\n", $userId, $strong, $profileWeak ? '1' : '0');
+        }
     }
 
     private function stagedCandidateIds(array $source, int $limit): array
