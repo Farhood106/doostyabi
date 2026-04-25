@@ -89,3 +89,11 @@ JOIN no_match_states n2
  AND n2.is_active = 0
  AND n1.id < n2.id;
 ```
+
+## PDO HY093 guardrails for native prepares
+
+- Production/shared-hosting PDO may run with `PDO::ATTR_EMULATE_PREPARES = false`.
+- Under native prepares, reusing the same named placeholder multiple times in a single SQL statement can raise `SQLSTATE[HY093]: Invalid parameter number`.
+- Repository queries are written with unique placeholder names per occurrence (e.g., `:uid_a`, `:uid_b`) even when bound to the same runtime value.
+- Verification fixtures force native behavior and include a static SQL placeholder audit:
+  - `php bin/verify_pdo_placeholder_safety.php`

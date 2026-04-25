@@ -18,6 +18,7 @@ final class ChatRepository
              FROM chats c
              JOIN matches m ON m.id = c.match_id
              WHERE c.id = :chat_id
+               -- keep placeholders unique for native prepares (HY093-safe)
                AND (:uid_a = m.user_a_id OR :uid_b = m.user_b_id)
              LIMIT 1"
         );
@@ -39,6 +40,7 @@ final class ChatRepository
              FROM chats c
              JOIN matches m ON m.id = c.match_id
              WHERE c.match_id = :match_id
+               -- keep placeholders unique for native prepares (HY093-safe)
                AND (:uid_a = m.user_a_id OR :uid_b = m.user_b_id)
              LIMIT 1"
         );

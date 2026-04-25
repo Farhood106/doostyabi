@@ -12,6 +12,7 @@ final class RevealRepository
 
     public function matchForUser(int $matchId, int $userId): ?array
     {
+        // Keep placeholders unique for native prepares (HY093-safe).
         $stmt = $this->pdo->prepare('SELECT id, user_a_id, user_b_id, status FROM matches WHERE id = :mid AND (:uid_a = user_a_id OR :uid_b = user_b_id) LIMIT 1');
         $stmt->execute(['mid' => $matchId, 'uid_a' => $userId, 'uid_b' => $userId]);
         $row = $stmt->fetch();
@@ -155,6 +156,7 @@ final class RevealRepository
              WHERE rr.match_id = :match_id
                AND rr.status = 'accepted'
                AND rr.requested_by_user_id <> :viewer
+               -- viewer placeholders intentionally split for native prepares
                AND ((m.user_a_id = :viewer_a AND c_other.user_id = m.user_a_id) OR (m.user_b_id = :viewer_b AND c_other.user_id = m.user_b_id))
                AND c_other.consent_status = 'accepted'
              ORDER BY rr.requested_at ASC"
