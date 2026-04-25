@@ -18,10 +18,14 @@ final class ChatRepository
              FROM chats c
              JOIN matches m ON m.id = c.match_id
              WHERE c.id = :chat_id
-               AND (:uid = m.user_a_id OR :uid = m.user_b_id)
+               AND (:uid_a = m.user_a_id OR :uid_b = m.user_b_id)
              LIMIT 1"
         );
-        $stmt->execute(['chat_id' => $chatId, 'uid' => $userId]);
+        $stmt->execute([
+            'chat_id' => $chatId,
+            'uid_a' => $userId,
+            'uid_b' => $userId,
+        ]);
         $row = $stmt->fetch();
 
         return $row ?: null;
@@ -35,10 +39,14 @@ final class ChatRepository
              FROM chats c
              JOIN matches m ON m.id = c.match_id
              WHERE c.match_id = :match_id
-               AND (:uid = m.user_a_id OR :uid = m.user_b_id)
+               AND (:uid_a = m.user_a_id OR :uid_b = m.user_b_id)
              LIMIT 1"
         );
-        $stmt->execute(['match_id' => $matchId, 'uid' => $userId]);
+        $stmt->execute([
+            'match_id' => $matchId,
+            'uid_a' => $userId,
+            'uid_b' => $userId,
+        ]);
         $row = $stmt->fetch();
 
         return $row ?: null;

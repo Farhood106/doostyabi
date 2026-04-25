@@ -14,6 +14,7 @@ function assertReveal(bool $ok, string $msg): void
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, status TEXT NOT NULL)');
 $pdo->exec('CREATE TABLE matches (id INTEGER PRIMARY KEY, user_a_id INTEGER, user_b_id INTEGER, status TEXT)');

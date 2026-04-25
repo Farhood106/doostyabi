@@ -16,6 +16,7 @@ function assertChat(bool $ok, string $msg): void
 
 $pdo = new PDO('sqlite::memory:');
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, status TEXT NOT NULL)');
 $pdo->exec('CREATE TABLE matches (
@@ -69,6 +70,10 @@ foreach ($ctx['messages'] as $m) {
     assertChat((string)$m['message_body'] !== 'hidden msg', 'hidden messages must be excluded');
     assertChat((string)$m['message_body'] !== 'deleted msg', 'deleted messages must be excluded');
 }
+
+// authorized access by match_id path
+$ctxByMatch = $service->openContext(1, null, 10);
+assertChat((int)$ctxByMatch['chat_id'] === 100, 'authorized participant should access chat by match_id');
 
 // unauthorized chat access blocked
 $blocked = false;
