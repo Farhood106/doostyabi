@@ -74,9 +74,9 @@ final class OnboardingController
             'communication_style' => (string)$request->input('communication_style'),
             'emotional_openness' => (string)$request->input('emotional_openness'),
             'relationship_pace' => (string)$request->input('relationship_pace'),
-            'independence_level' => (string)$request->input('independence_level'),
+            'independence_level' => (string)$request->input('independence_level', '3'),
             'boundary_sensitivity' => (string)$request->input('boundary_sensitivity'),
-            'structure_vs_spontaneity' => (string)$request->input('structure_vs_spontaneity'),
+            'structure_vs_spontaneity' => (string)$request->input('structure_vs_spontaneity', '3'),
             'smoking_preference' => (string)$request->input('smoking_preference'),
             'drinking_preference' => (string)$request->input('drinking_preference'),
             'activity_level' => (string)$request->input('activity_level'),
@@ -97,7 +97,9 @@ final class OnboardingController
 
         try {
             $uid = $this->userId();
-            $this->app->make(OnboardingRepository::class)->saveProfile($uid, $data);
+            $persistData = $data;
+            unset($persistData['province'], $persistData['city']);
+            $this->app->make(OnboardingRepository::class)->saveProfile($uid, $persistData);
         } catch (Throwable $e) {
             $this->logException($e, 'onboarding.profile');
             flash('message', 'common.unexpected_error');
@@ -293,7 +295,9 @@ final class OnboardingController
             'communication_style' => 'required|int',
             'emotional_openness' => 'required|int',
             'relationship_pace' => 'required|int',
+            'independence_level' => 'required|int',
             'boundary_sensitivity' => 'required|int',
+            'structure_vs_spontaneity' => 'required|int',
             'activity_level' => 'required|max:20',
         ]);
 

@@ -18,7 +18,32 @@ final class OnboardingRepository
                 birth_year=VALUES(birth_year), age_min_pref=VALUES(age_min_pref), age_max_pref=VALUES(age_max_pref), gender_identity=VALUES(gender_identity), interested_in_gender=VALUES(interested_in_gender), about_me=VALUES(about_me), looking_for=VALUES(looking_for), social_energy=VALUES(social_energy), communication_style=VALUES(communication_style), emotional_openness=VALUES(emotional_openness), relationship_pace=VALUES(relationship_pace), independence_level=VALUES(independence_level), boundary_sensitivity=VALUES(boundary_sensitivity), structure_vs_spontaneity=VALUES(structure_vs_spontaneity), smoking_preference=VALUES(smoking_preference), drinking_preference=VALUES(drinking_preference), activity_level=VALUES(activity_level), country_code=VALUES(country_code), region_code=VALUES(region_code), location_cell_l5=VALUES(location_cell_l5), location_cell_l4=VALUES(location_cell_l4), distance_radius_km=VALUES(distance_radius_km), profile_completed_at=NULL, updated_at=NOW()';
 
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($data + ['user_id' => $userId]);
+        $params = [
+            'user_id' => $userId,
+            'birth_year' => $data['birth_year'] ?? null,
+            'age_min_pref' => $data['age_min_pref'] ?? null,
+            'age_max_pref' => $data['age_max_pref'] ?? null,
+            'gender_identity' => $data['gender_identity'] ?? null,
+            'interested_in_gender' => $data['interested_in_gender'] ?? null,
+            'about_me' => $data['about_me'] ?? null,
+            'looking_for' => $data['looking_for'] ?? null,
+            'social_energy' => $data['social_energy'] ?? null,
+            'communication_style' => $data['communication_style'] ?? null,
+            'emotional_openness' => $data['emotional_openness'] ?? null,
+            'relationship_pace' => $data['relationship_pace'] ?? null,
+            'independence_level' => $data['independence_level'] ?? null,
+            'boundary_sensitivity' => $data['boundary_sensitivity'] ?? null,
+            'structure_vs_spontaneity' => $data['structure_vs_spontaneity'] ?? null,
+            'smoking_preference' => $data['smoking_preference'] ?? null,
+            'drinking_preference' => $data['drinking_preference'] ?? null,
+            'activity_level' => $data['activity_level'] ?? null,
+            'country_code' => $data['country_code'] ?? null,
+            'region_code' => $data['region_code'] ?? null,
+            'location_cell_l5' => $data['location_cell_l5'] ?? null,
+            'location_cell_l4' => $data['location_cell_l4'] ?? null,
+            'distance_radius_km' => $data['distance_radius_km'] ?? null,
+        ];
+        $stmt->execute($params);
     }
 
     public function replaceBoundaries(int $userId, array $rows): void
