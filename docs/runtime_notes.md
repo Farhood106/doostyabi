@@ -39,3 +39,11 @@
   - Save requires at least one selected boundary option.
   - After successful save, onboarding redirects to the next incomplete step (typically `availability`).
 - Custom boundary authoring can be added later via admin-managed catalog.
+
+## Predefined availability + goals in MVP onboarding
+
+- Availability step is selection-based (no manual `weekday/start_minute/end_minute` entry in UI).
+- User selects weekday checkboxes + friendly time blocks; backend maps to `availability_slots` with `timezone_name = Asia/Tehran`.
+- `weekend` time block maps to Iran weekend-friendly days (`Thursday` + `Friday`) for MVP.
+- Goals step remains DB-driven (`goals` table active items) but is rendered in user-friendly grouped sections with short descriptions.
+- Goal saving still uses existing `user_goals` flow and marks profile completed after successful submit.

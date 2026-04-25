@@ -77,6 +77,41 @@ final class OnboardingController
         ],
     ];
 
+    private const AVAILABILITY_DAY_CATALOG = [
+        'sat' => ['weekday' => 6, 'label_key' => 'onboarding.weekday.sat'],
+        'sun' => ['weekday' => 0, 'label_key' => 'onboarding.weekday.sun'],
+        'mon' => ['weekday' => 1, 'label_key' => 'onboarding.weekday.mon'],
+        'tue' => ['weekday' => 2, 'label_key' => 'onboarding.weekday.tue'],
+        'wed' => ['weekday' => 3, 'label_key' => 'onboarding.weekday.wed'],
+        'thu' => ['weekday' => 4, 'label_key' => 'onboarding.weekday.thu'],
+        'fri' => ['weekday' => 5, 'label_key' => 'onboarding.weekday.fri'],
+    ];
+
+    private const AVAILABILITY_TIME_BLOCK_CATALOG = [
+        'morning' => ['label_key' => 'onboarding.time_block.morning', 'start_minute' => 8 * 60, 'end_minute' => 12 * 60],
+        'noon' => ['label_key' => 'onboarding.time_block.noon', 'start_minute' => 12 * 60, 'end_minute' => 16 * 60],
+        'evening' => ['label_key' => 'onboarding.time_block.evening', 'start_minute' => 16 * 60, 'end_minute' => 20 * 60],
+        'night' => ['label_key' => 'onboarding.time_block.night', 'start_minute' => 20 * 60, 'end_minute' => (23 * 60) + 30],
+        // Iran weekend-friendly mapping for MVP: Thursday + Friday.
+        'weekend' => ['label_key' => 'onboarding.time_block.weekend', 'start_minute' => 10 * 60, 'end_minute' => 22 * 60, 'weekdays' => [4, 5]],
+        // "Anytime" means broad daily window; when no day is selected, all week days are used.
+        'anytime' => ['label_key' => 'onboarding.time_block.anytime', 'start_minute' => 8 * 60, 'end_minute' => (23 * 60) + 30],
+    ];
+
+    private const GOAL_GROUP_BY_SLUG = [
+        'friendly_conversation' => 'conversation',
+        'casual_connection' => 'conversation',
+        'emotional_connection' => 'emotional',
+        'long_term_relationship' => 'emotional',
+        'travel_companion' => 'travel_events',
+        'event_companion' => 'travel_events',
+        'sports_companion' => 'sports_activity',
+        'social_activity_partner' => 'sports_activity',
+        'project_collaboration' => 'collaboration',
+        'co_living' => 'collaboration',
+        'personal_growth_connection' => 'personal_growth',
+    ];
+
     private const IRAN_LOCATIONS = [
         'tehran' => ['fa' => 'تهران', 'en' => 'Tehran', 'cities' => [
             'tehran' => ['fa' => 'تهران', 'en' => 'Tehran'],
@@ -245,7 +280,7 @@ final class OnboardingController
     public function showAvailability(Request $request): void
     {
         $this->guardStep('availability');
-        View::render('onboarding/availability', $this->viewData());
+        View::render('onboarding/availability', $this->availabilityViewData());
     }
 
     public function saveAvailability(Request $request): never
@@ -253,47 +288,77 @@ final class OnboardingController
         $this->guardStep('availability');
         $this->validateCsrf($request, '/onboarding/availability');
 
-        $weekdays = (array)($request->input('weekday') ?? []);
-        $starts = (array)($request->input('start_minute') ?? []);
-        $ends = (array)($request->input('end_minute') ?? []);
+        $dayKeys = array_values(array_unique((array)($request->input('day_keys') ?? [])));
+        $timeBlockKeys = array_values(array_unique((array)($request->input('time_block_keys') ?? [])));
+        $_SESSION['_old']['day_keys'] = $dayKeys;
+        $_SESSION['_old']['time_block_keys'] = $timeBlockKeys;
 
         $rows = [];
         $errors = [];
+        $daysCatalog = self::AVAILABILITY_DAY_CATALOG;
+        $blocksCatalog = self::AVAILABILITY_TIME_BLOCK_CATALOG;
 
-        foreach ($weekdays as $i => $dayRaw) {
-            $day = (int)$dayRaw;
-            $start = (int)($starts[$i] ?? -1);
-            $end = (int)($ends[$i] ?? -1);
-
-            if ($day < 0 || $day > 6) {
-                $errors['weekday'][] = 'validation.weekday';
-            }
-            if ($start < 0 || $start > 1439) {
-                $errors['start_minute'][] = 'validation.time_range';
-            }
-            if ($end < 1 || $end > 1440) {
-                $errors['end_minute'][] = 'validation.time_range';
-            }
-            if ($start >= $end) {
-                $errors['end_minute'][] = 'validation.time_order';
-            }
-
-            $rows[] = [
-                'weekday' => $day,
-                'start_minute' => $start,
-                'end_minute' => $end,
-                'timezone_name' => 'Asia/Tehran',
-            ];
+        if ($dayKeys === [] && $timeBlockKeys === []) {
+            $errors['availability'][] = 'validation.availability_selection_required';
         }
 
-        if ($rows === []) {
-            $errors['weekday'][] = 'validation.required';
+        $selectedDays = [];
+        foreach ($dayKeys as $key) {
+            $id = trim((string)$key);
+            if (!isset($daysCatalog[$id])) {
+                $errors['day_keys'][] = 'validation.weekday';
+                continue;
+            }
+            $selectedDays[] = (int)$daysCatalog[$id]['weekday'];
+        }
+        $selectedDays = array_values(array_unique($selectedDays));
+
+        foreach ($timeBlockKeys as $key) {
+            $id = trim((string)$key);
+            if (!isset($blocksCatalog[$id])) {
+                $errors['time_block_keys'][] = 'validation.time_range';
+                continue;
+            }
+
+            $block = $blocksCatalog[$id];
+            $targetDays = [];
+            if (isset($block['weekdays'])) {
+                $targetDays = (array)$block['weekdays'];
+            } elseif ($id === 'anytime') {
+                $targetDays = $selectedDays !== [] ? $selectedDays : array_values(array_map(static fn(array $d): int => (int)$d['weekday'], $daysCatalog));
+            } else {
+                $targetDays = $selectedDays;
+            }
+
+            if ($targetDays === []) {
+                $errors['day_keys'][] = 'validation.availability_day_required';
+                continue;
+            }
+
+            foreach ($targetDays as $weekday) {
+                $rows[] = [
+                    'weekday' => (int)$weekday,
+                    'start_minute' => (int)$block['start_minute'],
+                    'end_minute' => (int)$block['end_minute'],
+                    'timezone_name' => 'Asia/Tehran',
+                ];
+            }
+        }
+
+        if ($timeBlockKeys === []) {
+            $errors['time_block_keys'][] = 'validation.availability_block_required';
+        }
+
+        if ($rows === [] && $errors === []) {
+            $errors['availability'][] = 'validation.availability_selection_required';
         }
 
         if ($errors !== []) {
             flash('errors', $errors);
             Response::redirect('/onboarding/availability');
         }
+
+        $rows = $this->deduplicateAvailabilityRows($rows);
 
         try {
             $this->app->make(OnboardingRepository::class)->replaceAvailability($this->userId(), $rows);
@@ -304,14 +369,18 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.availability_saved');
-        Response::redirect('/onboarding/goals');
+        $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
+        if ($next === 'done') {
+            Response::redirect('/dashboard');
+        }
+        Response::redirect('/onboarding/' . $next);
     }
 
     public function showGoals(Request $request): void
     {
         $this->guardStep('goals');
         $goals = $this->app->make(GoalRepository::class)->activeGoals();
-        View::render('onboarding/goals', $this->viewData() + ['goals' => $goals]);
+        View::render('onboarding/goals', $this->goalsViewData($goals));
     }
 
     public function saveGoals(Request $request): never
@@ -319,9 +388,10 @@ final class OnboardingController
         $this->guardStep('goals');
         $this->validateCsrf($request, '/onboarding/goals');
         $goalIds = array_values(array_unique(array_map('intval', (array)$request->input('goal_ids', []))));
+        $_SESSION['_old']['goal_ids'] = $goalIds;
 
         if (count($goalIds) === 0) {
-            flash('errors', ['goal_ids' => ['validation.required']]);
+            flash('errors', ['goal_ids' => ['validation.goal_selection_required']]);
             Response::redirect('/onboarding/goals');
         }
 
@@ -503,6 +573,54 @@ final class OnboardingController
         return $this->viewData() + ['boundaryGroups' => $groups];
     }
 
+    private function availabilityViewData(): array
+    {
+        $days = [];
+        foreach (self::AVAILABILITY_DAY_CATALOG as $id => $item) {
+            $days[] = [
+                'id' => $id,
+                'label_key' => (string)$item['label_key'],
+            ];
+        }
+
+        $blocks = [];
+        foreach (self::AVAILABILITY_TIME_BLOCK_CATALOG as $id => $item) {
+            $blocks[] = [
+                'id' => $id,
+                'label_key' => (string)$item['label_key'],
+            ];
+        }
+
+        return $this->viewData() + [
+            'availabilityDays' => $days,
+            'availabilityBlocks' => $blocks,
+        ];
+    }
+
+    private function goalsViewData(array $goals): array
+    {
+        $groups = [];
+        foreach ($goals as $goal) {
+            $slug = (string)($goal['slug'] ?? '');
+            $groupKey = self::GOAL_GROUP_BY_SLUG[$slug] ?? 'conversation';
+            $groups[$groupKey][] = $goal;
+        }
+
+        $ordered = [];
+        foreach (['conversation', 'emotional', 'travel_events', 'sports_activity', 'collaboration', 'personal_growth'] as $key) {
+            if (!isset($groups[$key])) {
+                continue;
+            }
+            $ordered[] = [
+                'group_key' => $key,
+                'title_key' => 'onboarding.goal_group.' . $key,
+                'goals' => $groups[$key],
+            ];
+        }
+
+        return $this->viewData() + ['goalGroups' => $ordered];
+    }
+
     private function flatBoundaryItems(): array
     {
         $flat = [];
@@ -512,6 +630,22 @@ final class OnboardingController
             }
         }
         return $flat;
+    }
+
+    private function deduplicateAvailabilityRows(array $rows): array
+    {
+        $unique = [];
+        foreach ($rows as $row) {
+            $token = implode('|', [
+                (string)$row['weekday'],
+                (string)$row['start_minute'],
+                (string)$row['end_minute'],
+                (string)$row['timezone_name'],
+            ]);
+            $unique[$token] = $row;
+        }
+
+        return array_values($unique);
     }
 
     private function deriveInternalLocation(string $province, string $city): array

@@ -1,13 +1,22 @@
 <?php ob_start(); $csrf = app()->make(App\Security\Csrf::class); ?>
 <h2><?= htmlspecialchars(t('onboarding.goals_title'), ENT_QUOTES, 'UTF-8') ?></h2>
+<p><?= htmlspecialchars(t('onboarding.goals_helper'), ENT_QUOTES, 'UTF-8') ?></p>
+<p><?= htmlspecialchars(t('onboarding.goals_priority_hint'), ENT_QUOTES, 'UTF-8') ?></p>
 <form method="post" action="/onboarding/goals">
 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
-<?php if ($e = fieldError($errors ?? [], 'goal_ids')): ?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
-<?php foreach ($goals as $goal): ?>
-    <label>
-        <input type="checkbox" name="goal_ids[]" value="<?= (int)$goal['id'] ?>">
-        <?= htmlspecialchars(t($goal['title_key']), ENT_QUOTES, 'UTF-8') ?>
-    </label>
+<?php if ($e = fieldError($errors ?? [], 'goal_ids')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+<?php $selectedGoalIds = array_map('intval', (array)old('goal_ids', [])); ?>
+<?php foreach (($goalGroups ?? []) as $group): ?>
+    <fieldset style="margin-top:12px;border:1px solid #ddd;padding:12px;border-radius:8px;">
+        <legend><?= htmlspecialchars(t((string)$group['title_key']), ENT_QUOTES, 'UTF-8') ?></legend>
+        <?php foreach (($group['goals'] ?? []) as $goal): ?>
+            <label style="display:block;padding:8px;border:1px solid #efefef;border-radius:8px;margin:8px 0;">
+                <input type="checkbox" name="goal_ids[]" value="<?= (int)$goal['id'] ?>" <?= in_array((int)$goal['id'], $selectedGoalIds, true) ? 'checked' : '' ?>>
+                <strong><?= htmlspecialchars(t((string)$goal['title_key']), ENT_QUOTES, 'UTF-8') ?></strong>
+                <div style="font-size:13px;color:#555;"><?= htmlspecialchars(t((string)$goal['description_key']), ENT_QUOTES, 'UTF-8') ?></div>
+            </label>
+        <?php endforeach; ?>
+    </fieldset>
 <?php endforeach; ?>
 <button class="btn" type="submit"><?= htmlspecialchars(t('common.finish'), ENT_QUOTES, 'UTF-8') ?></button>
 </form>
