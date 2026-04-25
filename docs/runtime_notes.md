@@ -26,3 +26,13 @@
   - `region_code = province`
   - `location_cell_l4 = province`
   - `location_cell_l5 = city`
+
+## Predefined boundaries in MVP onboarding
+
+- Boundaries step is now checklist-based (no free-text boundary key/value input).
+- UI shows grouped user-friendly options; each selected option stores one row in `profile_boundaries`.
+- Stored mapping is stable and machine-friendly:
+  - `boundary_key` = group key (e.g. `privacy`, `safety`)
+  - `boundary_value` = option key (e.g. `no_recording_without_consent`)
+  - `importance` = one of `preferred` / `required` / `avoid`
+- Custom boundary authoring can be added later via admin-managed catalog.

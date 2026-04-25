@@ -18,6 +18,65 @@ use Throwable;
 
 final class OnboardingController
 {
+    private const BOUNDARY_CATALOG = [
+        'communication' => [
+            'title_key' => 'onboarding.boundary_group.communication',
+            'items' => [
+                'communication.response_pace' => ['key' => 'communication', 'value' => 'response_pace'],
+                'communication.respectful_tone' => ['key' => 'communication', 'value' => 'respectful_tone'],
+            ],
+        ],
+        'privacy' => [
+            'title_key' => 'onboarding.boundary_group.privacy',
+            'items' => [
+                'privacy.no_personal_details_early' => ['key' => 'privacy', 'value' => 'no_personal_details_early'],
+                'privacy.no_recording_without_consent' => ['key' => 'privacy', 'value' => 'no_recording_without_consent'],
+            ],
+        ],
+        'in_person_meeting' => [
+            'title_key' => 'onboarding.boundary_group.in_person_meeting',
+            'items' => [
+                'in_person_meeting.public_place_first' => ['key' => 'in_person_meeting', 'value' => 'public_place_first'],
+                'in_person_meeting.no_late_night_first' => ['key' => 'in_person_meeting', 'value' => 'no_late_night_first'],
+            ],
+        ],
+        'emotional' => [
+            'title_key' => 'onboarding.boundary_group.emotional',
+            'items' => [
+                'emotional.no_pressure_for_fast_attachment' => ['key' => 'emotional', 'value' => 'no_pressure_for_fast_attachment'],
+                'emotional.honest_expectations' => ['key' => 'emotional', 'value' => 'honest_expectations'],
+            ],
+        ],
+        'pacing' => [
+            'title_key' => 'onboarding.boundary_group.pacing',
+            'items' => [
+                'pacing.step_by_step' => ['key' => 'pacing', 'value' => 'step_by_step'],
+                'pacing.no_daily_contact_requirement' => ['key' => 'pacing', 'value' => 'no_daily_contact_requirement'],
+            ],
+        ],
+        'social_media' => [
+            'title_key' => 'onboarding.boundary_group.social_media',
+            'items' => [
+                'social_media.no_forced_follow' => ['key' => 'social_media', 'value' => 'no_forced_follow'],
+                'social_media.no_posting_without_consent' => ['key' => 'social_media', 'value' => 'no_posting_without_consent'],
+            ],
+        ],
+        'safety' => [
+            'title_key' => 'onboarding.boundary_group.safety',
+            'items' => [
+                'safety.block_on_disrespect' => ['key' => 'safety', 'value' => 'block_on_disrespect'],
+                'safety.end_chat_on_abuse' => ['key' => 'safety', 'value' => 'end_chat_on_abuse'],
+            ],
+        ],
+        'intimacy_or_sensitive_content' => [
+            'title_key' => 'onboarding.boundary_group.intimacy_or_sensitive_content',
+            'items' => [
+                'intimacy_or_sensitive_content.no_sensitive_media_early' => ['key' => 'intimacy_or_sensitive_content', 'value' => 'no_sensitive_media_early'],
+                'intimacy_or_sensitive_content.respect_sensitive_topics' => ['key' => 'intimacy_or_sensitive_content', 'value' => 'respect_sensitive_topics'],
+            ],
+        ],
+    ];
+
     private const IRAN_LOCATIONS = [
         'tehran' => ['fa' => 'تهران', 'en' => 'Tehran', 'cities' => [
             'tehran' => ['fa' => 'تهران', 'en' => 'Tehran'],
@@ -117,7 +176,7 @@ final class OnboardingController
     public function showBoundaries(Request $request): void
     {
         $this->guardStep('boundaries');
-        View::render('onboarding/boundaries', $this->viewData());
+        View::render('onboarding/boundaries', $this->boundaryViewData());
     }
 
     public function saveBoundaries(Request $request): never
@@ -125,37 +184,41 @@ final class OnboardingController
         $this->guardStep('boundaries');
         $this->validateCsrf($request, '/onboarding/boundaries');
 
-        $keys = (array)($request->input('boundary_key') ?? []);
-        $values = (array)($request->input('boundary_value') ?? []);
-        $importance = (array)($request->input('importance') ?? []);
+        $selectedBoundaryIds = array_values(array_unique((array)($request->input('boundary_ids') ?? [])));
+        $importanceMap = (array)($request->input('importance') ?? []);
+        $_SESSION['_old']['boundary_ids'] = $selectedBoundaryIds;
+        $_SESSION['_old']['importance'] = $importanceMap;
 
         $rows = [];
         $errors = [];
         $allowedImportance = ['required', 'preferred', 'avoid'];
+        $catalogItems = $this->flatBoundaryItems();
 
-        foreach ($keys as $i => $key) {
-            $k = trim((string)$key);
-            $v = trim((string)($values[$i] ?? ''));
-            $imp = (string)($importance[$i] ?? 'preferred');
-
-            if ($k === '' && $v === '') {
+        foreach ($selectedBoundaryIds as $boundaryId) {
+            $id = trim((string)$boundaryId);
+            if ($id === '') {
                 continue;
             }
 
+            if (!isset($catalogItems[$id])) {
+                $errors['boundary_ids'][] = 'validation.boundary_invalid';
+                continue;
+            }
+
+            $imp = (string)($importanceMap[$id] ?? 'preferred');
             if (!in_array($imp, $allowedImportance, true)) {
                 $errors['importance'][] = 'validation.invalid_importance';
             }
 
-            if ($k === '' || $v === '') {
-                $errors['boundary_key'][] = 'validation.required';
-                continue;
-            }
-
-            $rows[] = ['key' => $k, 'value' => $v, 'importance' => $imp];
+            $rows[] = [
+                'key' => $catalogItems[$id]['key'],
+                'value' => $catalogItems[$id]['value'],
+                'importance' => $imp,
+            ];
         }
 
         if ($rows === []) {
-            $errors['boundary_key'][] = 'validation.required';
+            $errors['boundary_ids'][] = 'validation.required';
         }
 
         if ($errors !== []) {
@@ -411,6 +474,40 @@ final class OnboardingController
             'provinces' => $provinces,
             'cities' => $cities,
         ];
+    }
+
+    private function boundaryViewData(): array
+    {
+        $groups = [];
+        foreach (self::BOUNDARY_CATALOG as $groupKey => $group) {
+            $items = [];
+            foreach ($group['items'] as $id => $payload) {
+                $items[] = [
+                    'id' => $id,
+                    'label_key' => 'onboarding.boundary_item.' . $id,
+                    'key' => $payload['key'],
+                    'value' => $payload['value'],
+                ];
+            }
+            $groups[] = [
+                'group_key' => $groupKey,
+                'title_key' => $group['title_key'],
+                'items' => $items,
+            ];
+        }
+
+        return $this->viewData() + ['boundaryGroups' => $groups];
+    }
+
+    private function flatBoundaryItems(): array
+    {
+        $flat = [];
+        foreach (self::BOUNDARY_CATALOG as $group) {
+            foreach ($group['items'] as $id => $payload) {
+                $flat[$id] = $payload;
+            }
+        }
+        return $flat;
     }
 
     private function deriveInternalLocation(string $province, string $city): array
