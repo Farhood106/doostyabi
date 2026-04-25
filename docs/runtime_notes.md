@@ -64,3 +64,24 @@
   - `php bin/cron_generate_candidates.php`
   - `php bin/cron_build_match_cards.php`
 - Until those run, dashboard can legitimately show no cards.
+
+## No-match state uniqueness + cron safety (MySQL/MariaDB)
+
+- `no_match_states` keeps unique key `uq_no_match_active_scope (user_id, goal_scope_key, is_active)`.
+- In MySQL/MariaDB this means only one inactive row can coexist per scope too.
+- Candidate generation now prunes old inactive rows in the same scope before deactivating active rows, preventing duplicate-key (`1062`) during cron.
+- MVP tradeoff: no-match history is reduced to one inactive row per scope.
+
+### One-time cleanup for existing deployments (safe before cron)
+
+```sql
+-- Keep newest inactive row per (user_id, goal_scope_key), delete older inactive duplicates.
+DELETE n1
+FROM no_match_states n1
+JOIN no_match_states n2
+  ON n1.user_id = n2.user_id
+ AND n1.goal_scope_key = n2.goal_scope_key
+ AND n1.is_active = 0
+ AND n2.is_active = 0
+ AND n1.id < n2.id;
+```

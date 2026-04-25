@@ -80,6 +80,7 @@ function createRepo(): array
         created_at TEXT,
         updated_at TEXT
     )');
+    $pdo->exec('CREATE UNIQUE INDEX uq_no_match_active_scope ON no_match_states (user_id, goal_scope_key, is_active)');
 
     return [$pdo, new CandidateRepository($pdo)];
 }
@@ -256,11 +257,36 @@ function testNoMatchLifecycle(): void
     assertTrue($state === 'profile_improvement_suggested', 'weak profile with no strong candidates should suggest profile improvement');
 }
 
+function testNoMatchDeactivationHandlesExistingInactiveRow(): void
+{
+    [$pdo, $repo] = createRepo();
+    $now = date('Y-m-d H:i:s');
+
+    // Existing inactive row in the same scope.
+    $pdo->prepare('INSERT INTO no_match_states (user_id, goal_id, goal_scope_key, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at) VALUES (3, 2, 2, ?, ?, 0, ?, 1, ?, ?)')
+        ->execute(['notified_waiting', '{}', $now, $now, $now]);
+    // Current active row in the same scope.
+    $pdo->prepare('INSERT INTO no_match_states (user_id, goal_id, goal_scope_key, state, context_json, is_active, next_recheck_at, notify_on_strong_match, created_at, updated_at) VALUES (3, 2, 2, ?, ?, 1, ?, 1, ?, ?)')
+        ->execute(['searching', '{}', $now, $now, $now]);
+
+    // Must not throw duplicate-key on deactivation.
+    $repo->deactivateActiveNoMatchStates(3, 2);
+
+    $inactiveCount = (int)$pdo->query('SELECT COUNT(*) FROM no_match_states WHERE user_id = 3 AND goal_scope_key = 2 AND is_active = 0')->fetchColumn();
+    assertTrue($inactiveCount === 1, 'exactly one inactive row should remain after duplicate-safe deactivation');
+
+    // New active row can be inserted after deactivation.
+    $repo->insertNoMatchState(3, 2, 'expand_preferences_suggested', ['reason' => 'verify']);
+    $activeCount = (int)$pdo->query('SELECT COUNT(*) FROM no_match_states WHERE user_id = 3 AND goal_scope_key = 2 AND is_active = 1')->fetchColumn();
+    assertTrue($activeCount === 1, 'a new active no-match row should be insertable after deactivation');
+}
+
 try {
     testSelectionBucketsAndQueue();
     testHardRejections();
     testSymmetricScheduleOverlap();
     testNoMatchLifecycle();
+    testNoMatchDeactivationHandlesExistingInactiveRow();
     echo "OK: matching phase-1 verification passed\n";
 } catch (Throwable $e) {
     fwrite(STDERR, $e->getMessage() . "\n");

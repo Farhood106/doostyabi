@@ -517,6 +517,9 @@ CREATE TABLE no_match_states (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_no_match_states_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_no_match_states_goal FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL,
+  -- Note: with MySQL/MariaDB this unique key allows at most one active and at most one
+  -- inactive row per (user_id, goal_scope_key). Application logic prunes old inactive rows
+  -- before deactivation to avoid duplicate-key errors.
   UNIQUE KEY uq_no_match_active_scope (user_id, goal_scope_key, is_active),
   KEY idx_no_match_recheck (state, is_active, next_recheck_at),
   KEY idx_no_match_notify (notify_on_strong_match, is_active)

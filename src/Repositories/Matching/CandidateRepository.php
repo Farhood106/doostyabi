@@ -204,14 +204,27 @@ final class CandidateRepository
     public function deactivateActiveNoMatchStates(int $userId, ?int $goalId): void
     {
         $goalScope = $goalId ?? 0;
-        $stmt = $this->pdo->prepare(
+        $now = $this->now();
+
+        // `uq_no_match_active_scope (user_id, goal_scope_key, is_active)` allows only one
+        // inactive row as well. To avoid duplicate-key errors on shared-hosting MySQL/MariaDB,
+        // prune previous inactive rows in the same scope before deactivating current active row.
+        $deleteInactive = $this->pdo->prepare(
+            "DELETE FROM no_match_states
+             WHERE user_id = :uid
+               AND goal_scope_key = :goal_scope
+               AND is_active = 0"
+        );
+        $deleteInactive->execute(['uid' => $userId, 'goal_scope' => $goalScope]);
+
+        $deactivateActive = $this->pdo->prepare(
             "UPDATE no_match_states
              SET is_active = 0, updated_at = :updated
              WHERE user_id = :uid
                AND goal_scope_key = :goal_scope
                AND is_active = 1"
         );
-        $stmt->execute(['uid' => $userId, 'goal_scope' => $goalScope, 'updated' => $this->now()]);
+        $deactivateActive->execute(['uid' => $userId, 'goal_scope' => $goalScope, 'updated' => $now]);
     }
 
     public function insertNoMatchState(int $userId, ?int $goalId, string $state, array $context): void
