@@ -5,7 +5,7 @@
 <form method="post" action="/onboarding/goals">
 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
 <?php if ($e = fieldError($errors ?? [], 'goal_ids')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
-<?php $selectedGoalIds = array_map('intval', (array)old('goal_ids', [])); ?>
+<?php $selectedGoalIds = array_map('intval', (array)($selectedGoalIds ?? [])); ?>
 <?php foreach (($goalGroups ?? []) as $group): ?>
     <fieldset style="margin-top:12px;border:1px solid #ddd;padding:12px;border-radius:8px;">
         <legend><?= htmlspecialchars(t((string)$group['title_key']), ENT_QUOTES, 'UTF-8') ?></legend>

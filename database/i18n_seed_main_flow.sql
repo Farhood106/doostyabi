@@ -314,6 +314,8 @@ INSERT INTO i18n_texts (namespace, text_key, locale_code, text_value) VALUES
 ('dashboard','dashboard.match_cards_title','en','Compatibility cards'),
 ('dashboard','dashboard.match_cards_empty','fa','هنوز کارتی برای نمایش وجود ندارد.'),
 ('dashboard','dashboard.match_cards_empty','en','No cards available yet.'),
+('dashboard','dashboard.match_cards_processing_hint','fa','پیشنهادها پس از اجرای کران‌های تطبیق (تولید کاندیدا و ساخت کارت) نمایش داده می‌شوند.'),
+('dashboard','dashboard.match_cards_processing_hint','en','Suggestions appear after matching cron jobs run (candidate generation and card build).'),
 
 ('match','match.interest.interested','fa','علاقه‌مندم'),
 ('match','match.interest.interested','en','Interested'),

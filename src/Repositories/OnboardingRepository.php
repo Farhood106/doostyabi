@@ -94,6 +94,36 @@ final class OnboardingRepository
         return array_map(static fn(array $row) => (int)$row['id'], $stmt->fetchAll());
     }
 
+    public function getProfileForUser(int $userId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT birth_year, age_min_pref, age_max_pref, gender_identity, interested_in_gender, about_me, looking_for, social_energy, communication_style, emotional_openness, relationship_pace, independence_level, boundary_sensitivity, structure_vs_spontaneity, smoking_preference, drinking_preference, activity_level, region_code, location_cell_l5, distance_radius_km, profile_completed_at FROM profiles WHERE user_id = :uid LIMIT 1');
+        $stmt->execute(['uid' => $userId]);
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $row;
+    }
+
+    public function getBoundariesForUser(int $userId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT boundary_key, boundary_value, importance FROM profile_boundaries WHERE user_id = :uid');
+        $stmt->execute(['uid' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getAvailabilityForUser(int $userId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT weekday, start_minute, end_minute, timezone_name FROM availability_slots WHERE user_id = :uid');
+        $stmt->execute(['uid' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getActiveGoalIdsForUser(int $userId): array
+    {
+        $stmt = $this->pdo->prepare("SELECT goal_id FROM user_goals WHERE user_id = :uid AND status = 'active' ORDER BY priority ASC");
+        $stmt->execute(['uid' => $userId]);
+        return array_map(static fn(array $row): int => (int)$row['goal_id'], $stmt->fetchAll());
+    }
+
     public function completionState(int $userId): array
     {
         $profile = $this->hasRows('profiles', $userId);

@@ -5,7 +5,7 @@
 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
 <?php if ($e = fieldError($errors ?? [], 'boundary_ids')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 <?php if ($e = fieldError($errors ?? [], 'importance')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
-<?php $selected = (array)old('boundary_ids', []); $importance = (array)old('importance', []); ?>
+<?php $selected = (array)($selectedBoundaryIds ?? []); $importance = (array)($selectedBoundaryImportance ?? []); ?>
 
 <?php foreach (($boundaryGroups ?? []) as $group): ?>
 <fieldset style="margin-top:12px;border:1px solid #ddd;padding:12px;border-radius:8px;">

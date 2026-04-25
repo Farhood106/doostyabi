@@ -26,6 +26,7 @@ $csrf = app()->make(App\Security\Csrf::class);
 <h3><?= htmlspecialchars(t('dashboard.match_cards_title'), ENT_QUOTES, 'UTF-8') ?></h3>
 <?php if (empty($cards ?? [])): ?>
     <p><?= htmlspecialchars(t('dashboard.match_cards_empty'), ENT_QUOTES, 'UTF-8') ?></p>
+    <p style="font-size:13px;color:#555;"><?= htmlspecialchars(t('dashboard.match_cards_processing_hint'), ENT_QUOTES, 'UTF-8') ?></p>
 <?php else: ?>
     <ul>
         <?php foreach ($cards as $card): ?>

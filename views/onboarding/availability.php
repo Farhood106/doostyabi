@@ -6,7 +6,7 @@
 <?php if ($e = fieldError($errors ?? [], 'availability')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 <?php if ($e = fieldError($errors ?? [], 'day_keys')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 <?php if ($e = fieldError($errors ?? [], 'time_block_keys')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
-<?php $selectedDays = (array)old('day_keys', []); $selectedBlocks = (array)old('time_block_keys', []); ?>
+<?php $selectedDays = (array)($selectedDayKeys ?? []); $selectedBlocks = (array)($selectedTimeBlockKeys ?? []); ?>
 
 <fieldset style="margin-top:12px;border:1px solid #ddd;padding:12px;border-radius:8px;">
     <legend><?= htmlspecialchars(t('onboarding.availability_days_label'), ENT_QUOTES, 'UTF-8') ?></legend>

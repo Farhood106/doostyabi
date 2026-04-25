@@ -47,3 +47,20 @@
 - `weekend` time block maps to Iran weekend-friendly days (`Thursday` + `Friday`) for MVP.
 - Goals step remains DB-driven (`goals` table active items) but is rendered in user-friendly grouped sections with short descriptions.
 - Goal saving still uses existing `user_goals` flow and marks profile completed after successful submit.
+
+## Onboarding persistence/readback behavior
+
+- Every onboarding step loads saved DB values when revisited:
+  - Profile from `profiles` (with `region_code -> province` and `location_cell_l5 -> city` reconstruction)
+  - Boundaries from `profile_boundaries`
+  - Availability from `availability_slots` (reverse-mapped to UI day/block selections)
+  - Goals from active rows in `user_goals`
+- Prefill priority is: failed-submit session input (`_old`) > saved DB values > defaults.
+
+## Match card generation dependency
+
+- Dashboard cards are not generated synchronously on onboarding submit.
+- In shared-hosting deployments, schedule both jobs:
+  - `php bin/cron_generate_candidates.php`
+  - `php bin/cron_build_match_cards.php`
+- Until those run, dashboard can legitimately show no cards.

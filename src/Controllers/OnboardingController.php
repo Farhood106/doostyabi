@@ -201,6 +201,12 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.profile_saved');
+        $this->clearOldInputs([
+            'birth_year','age_min_pref','age_max_pref','gender_identity','interested_in_gender','about_me','looking_for',
+            'social_energy','communication_style','emotional_openness','relationship_pace','independence_level',
+            'boundary_sensitivity','structure_vs_spontaneity','smoking_preference','drinking_preference','activity_level',
+            'province','city','distance_radius_km','country_code','region_code','location_cell_l5','location_cell_l4',
+        ]);
         $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
         if ($next === 'done') {
             Response::redirect('/dashboard');
@@ -270,6 +276,7 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.boundaries_saved');
+        $this->clearOldInputs(['boundary_ids', 'importance']);
         $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
         if ($next === 'done') {
             Response::redirect('/dashboard');
@@ -369,6 +376,7 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.availability_saved');
+        $this->clearOldInputs(['day_keys', 'time_block_keys']);
         $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
         if ($next === 'done') {
             Response::redirect('/dashboard');
@@ -522,11 +530,52 @@ final class OnboardingController
 
     private function profileViewData(): array
     {
+        $saved = $this->app->make(OnboardingRepository::class)->getProfileForUser($this->userId()) ?? [];
+        $savedProvince = (string)($saved['region_code'] ?? 'tehran');
+        $savedCity = (string)($saved['location_cell_l5'] ?? 'tehran');
+        if (!$this->isValidIranLocation($savedProvince, $savedCity)) {
+            $savedProvince = 'tehran';
+            $savedCity = 'tehran';
+        }
+
+        $form = [
+            'birth_year' => (string)($saved['birth_year'] ?? ''),
+            'age_min_pref' => (string)($saved['age_min_pref'] ?? '23'),
+            'age_max_pref' => (string)($saved['age_max_pref'] ?? '35'),
+            'gender_identity' => (string)($saved['gender_identity'] ?? 'woman'),
+            'interested_in_gender' => (string)($saved['interested_in_gender'] ?? ''),
+            'about_me' => (string)($saved['about_me'] ?? ''),
+            'looking_for' => (string)($saved['looking_for'] ?? ''),
+            'social_energy' => (string)($saved['social_energy'] ?? '3'),
+            'communication_style' => (string)($saved['communication_style'] ?? '3'),
+            'emotional_openness' => (string)($saved['emotional_openness'] ?? '3'),
+            'relationship_pace' => (string)($saved['relationship_pace'] ?? '3'),
+            'independence_level' => (string)($saved['independence_level'] ?? '3'),
+            'boundary_sensitivity' => (string)($saved['boundary_sensitivity'] ?? '3'),
+            'structure_vs_spontaneity' => (string)($saved['structure_vs_spontaneity'] ?? '3'),
+            'smoking_preference' => (string)($saved['smoking_preference'] ?? 'no'),
+            'drinking_preference' => (string)($saved['drinking_preference'] ?? 'no'),
+            'activity_level' => (string)($saved['activity_level'] ?? 'moderate'),
+            'province' => $savedProvince,
+            'city' => $savedCity,
+            'distance_radius_km' => (string)($saved['distance_radius_km'] ?? '30'),
+        ];
+
+        foreach (array_keys($form) as $field) {
+            if ($this->hasOldInput($field)) {
+                $form[$field] = (string)$this->oldInput($field, $form[$field]);
+            }
+        }
+
         $locale = currentLocale();
-        $selectedProvince = (string)old('province', 'tehran');
+        $selectedProvince = (string)$form['province'];
         if (!isset(self::IRAN_LOCATIONS[$selectedProvince])) {
             $selectedProvince = 'tehran';
         }
+        if (!isset(self::IRAN_LOCATIONS[$selectedProvince]['cities'][(string)$form['city']])) {
+            $form['city'] = array_key_first(self::IRAN_LOCATIONS[$selectedProvince]['cities']) ?: 'tehran';
+        }
+        $form['province'] = $selectedProvince;
 
         $provinces = [];
         foreach (self::IRAN_LOCATIONS as $slug => $row) {
@@ -547,11 +596,38 @@ final class OnboardingController
         return $this->viewData() + [
             'provinces' => $provinces,
             'cities' => $cities,
+            'form' => $form,
         ];
     }
 
     private function boundaryViewData(): array
     {
+        $savedRows = $this->app->make(OnboardingRepository::class)->getBoundariesForUser($this->userId());
+        $flat = $this->flatBoundaryItems();
+        $idByPair = [];
+        foreach ($flat as $id => $payload) {
+            $idByPair[$payload['key'] . '|' . $payload['value']] = $id;
+        }
+
+        $savedSelected = [];
+        $savedImportance = [];
+        foreach ($savedRows as $row) {
+            $token = (string)$row['boundary_key'] . '|' . (string)$row['boundary_value'];
+            if (!isset($idByPair[$token])) {
+                continue;
+            }
+            $id = $idByPair[$token];
+            $savedSelected[] = $id;
+            $savedImportance[$id] = (string)$row['importance'];
+        }
+
+        $selected = $this->hasOldInput('boundary_ids')
+            ? array_values(array_unique(array_map(static fn(mixed $v): string => trim((string)$v), (array)$this->oldInput('boundary_ids', []))))
+            : $savedSelected;
+        $importance = $this->hasOldInput('importance')
+            ? (array)$this->oldInput('importance', [])
+            : $savedImportance;
+
         $groups = [];
         foreach (self::BOUNDARY_CATALOG as $groupKey => $group) {
             $items = [];
@@ -570,11 +646,62 @@ final class OnboardingController
             ];
         }
 
-        return $this->viewData() + ['boundaryGroups' => $groups];
+        return $this->viewData() + [
+            'boundaryGroups' => $groups,
+            'selectedBoundaryIds' => $selected,
+            'selectedBoundaryImportance' => $importance,
+        ];
     }
 
     private function availabilityViewData(): array
     {
+        $savedRows = $this->app->make(OnboardingRepository::class)->getAvailabilityForUser($this->userId());
+        $reverseDay = [];
+        foreach (self::AVAILABILITY_DAY_CATALOG as $id => $item) {
+            $reverseDay[(int)$item['weekday']] = $id;
+        }
+
+        $savedDays = [];
+        $rowsByToken = [];
+        foreach ($savedRows as $row) {
+            $weekday = (int)$row['weekday'];
+            if (isset($reverseDay[$weekday])) {
+                $savedDays[] = $reverseDay[$weekday];
+            }
+            $token = $weekday . '|' . (int)$row['start_minute'] . '|' . (int)$row['end_minute'];
+            $rowsByToken[$token] = true;
+        }
+        $savedDays = array_values(array_unique($savedDays));
+
+        $savedBlocks = [];
+        if (isset($rowsByToken['4|600|1320'], $rowsByToken['5|600|1320'])) {
+            $savedBlocks[] = 'weekend';
+            unset($rowsByToken['4|600|1320'], $rowsByToken['5|600|1320']);
+        }
+
+        foreach (array_keys($rowsByToken) as $token) {
+            $parts = explode('|', $token);
+            $start = (int)($parts[1] ?? -1);
+            $end = (int)($parts[2] ?? -1);
+            foreach (self::AVAILABILITY_TIME_BLOCK_CATALOG as $blockId => $block) {
+                if ($blockId === 'weekend') {
+                    continue;
+                }
+                if ((int)$block['start_minute'] === $start && (int)$block['end_minute'] === $end) {
+                    $savedBlocks[] = $blockId;
+                    break;
+                }
+            }
+        }
+        $savedBlocks = array_values(array_unique($savedBlocks));
+
+        $selectedDays = $this->hasOldInput('day_keys')
+            ? array_values(array_unique(array_map(static fn(mixed $v): string => trim((string)$v), (array)$this->oldInput('day_keys', []))))
+            : $savedDays;
+        $selectedBlocks = $this->hasOldInput('time_block_keys')
+            ? array_values(array_unique(array_map(static fn(mixed $v): string => trim((string)$v), (array)$this->oldInput('time_block_keys', []))))
+            : $savedBlocks;
+
         $days = [];
         foreach (self::AVAILABILITY_DAY_CATALOG as $id => $item) {
             $days[] = [
@@ -594,11 +721,18 @@ final class OnboardingController
         return $this->viewData() + [
             'availabilityDays' => $days,
             'availabilityBlocks' => $blocks,
+            'selectedDayKeys' => $selectedDays,
+            'selectedTimeBlockKeys' => $selectedBlocks,
         ];
     }
 
     private function goalsViewData(array $goals): array
     {
+        $savedGoalIds = $this->app->make(OnboardingRepository::class)->getActiveGoalIdsForUser($this->userId());
+        $selectedGoalIds = $this->hasOldInput('goal_ids')
+            ? array_values(array_unique(array_map('intval', (array)$this->oldInput('goal_ids', []))))
+            : $savedGoalIds;
+
         $groups = [];
         foreach ($goals as $goal) {
             $slug = (string)($goal['slug'] ?? '');
@@ -618,7 +752,10 @@ final class OnboardingController
             ];
         }
 
-        return $this->viewData() + ['goalGroups' => $ordered];
+        return $this->viewData() + [
+            'goalGroups' => $ordered,
+            'selectedGoalIds' => $selectedGoalIds,
+        ];
     }
 
     private function flatBoundaryItems(): array
@@ -646,6 +783,31 @@ final class OnboardingController
         }
 
         return array_values($unique);
+    }
+
+    private function hasOldInput(string $key): bool
+    {
+        return isset($_SESSION['_old']) && array_key_exists($key, $_SESSION['_old']);
+    }
+
+    private function oldInput(string $key, mixed $default = null): mixed
+    {
+        return $this->hasOldInput($key) ? $_SESSION['_old'][$key] : $default;
+    }
+
+    private function clearOldInputs(array $keys): void
+    {
+        if (!isset($_SESSION['_old'])) {
+            return;
+        }
+
+        foreach ($keys as $key) {
+            unset($_SESSION['_old'][$key]);
+        }
+
+        if ($_SESSION['_old'] === []) {
+            unset($_SESSION['_old']);
+        }
     }
 
     private function deriveInternalLocation(string $province, string $city): array
