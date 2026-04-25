@@ -218,7 +218,7 @@ final class OnboardingController
         }
 
         if ($rows === []) {
-            $errors['boundary_ids'][] = 'validation.required';
+            $errors['boundary_ids'][] = 'validation.boundary_selection_required';
         }
 
         if ($errors !== []) {
@@ -235,7 +235,11 @@ final class OnboardingController
         }
 
         flash('message', 'onboarding.boundaries_saved');
-        Response::redirect('/onboarding/availability');
+        $next = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($this->userId());
+        if ($next === 'done') {
+            Response::redirect('/dashboard');
+        }
+        Response::redirect('/onboarding/' . $next);
     }
 
     public function showAvailability(Request $request): void

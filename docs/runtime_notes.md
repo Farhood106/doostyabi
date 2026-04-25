@@ -35,4 +35,7 @@
   - `boundary_key` = group key (e.g. `privacy`, `safety`)
   - `boundary_value` = option key (e.g. `no_recording_without_consent`)
   - `importance` = one of `preferred` / `required` / `avoid`
+- UX behavior:
+  - Save requires at least one selected boundary option.
+  - After successful save, onboarding redirects to the next incomplete step (typically `availability`).
 - Custom boundary authoring can be added later via admin-managed catalog.

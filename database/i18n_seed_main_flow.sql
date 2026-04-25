@@ -76,6 +76,8 @@ INSERT INTO i18n_texts (namespace, text_key, locale_code, text_value) VALUES
 ('validation','validation.preference_invalid','en','Selected preference is invalid.'),
 ('validation','validation.boundary_invalid','fa','مرز انتخاب‌شده معتبر نیست.'),
 ('validation','validation.boundary_invalid','en','Selected boundary is invalid.'),
+('validation','validation.boundary_selection_required','fa','حداقل یک مرز شخصی را انتخاب کنید.'),
+('validation','validation.boundary_selection_required','en','Please select at least one personal boundary.'),
 
 ('onboarding','onboarding.profile_title','fa','تکمیل پروفایل'),
 ('onboarding','onboarding.profile_title','en','Profile setup'),
@@ -239,7 +241,7 @@ INSERT INTO i18n_texts (namespace, text_key, locale_code, text_value) VALUES
 ('onboarding','onboarding.goals_title','en','Your goals'),
 ('onboarding','onboarding.profile_saved','fa','پروفایل با موفقیت ذخیره شد.'),
 ('onboarding','onboarding.profile_saved','en','Profile saved successfully.'),
-('onboarding','onboarding.boundaries_saved','fa','مرزهای شخصی ذخیره شد.'),
+('onboarding','onboarding.boundaries_saved','fa','مرزهای شخصی شما ذخیره شد.'),
 ('onboarding','onboarding.boundaries_saved','en','Boundaries saved successfully.'),
 ('onboarding','onboarding.availability_saved','fa','زمان‌های در دسترس ذخیره شد.'),
 ('onboarding','onboarding.availability_saved','en','Availability saved successfully.'),
