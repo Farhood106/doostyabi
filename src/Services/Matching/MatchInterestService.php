@@ -5,11 +5,20 @@ declare(strict_types=1);
 namespace App\Services\Matching;
 
 use App\Repositories\Matching\MatchInterestRepository;
+use App\Repositories\ChatRepository;
+use App\Services\ChatService;
+use App\Services\GoalAwareStarterPromptService;
+use App\Services\NotificationService;
 use InvalidArgumentException;
+use PDO;
 
 final class MatchInterestService
 {
-    public function __construct(private readonly MatchInterestRepository $repo) {}
+    public function __construct(
+        private readonly MatchInterestRepository $repo,
+        private readonly ?NotificationService $notifications = null,
+        private readonly ?PDO $pdo = null,
+    ) {}
 
     public function applyAction(int $matchId, int $actorUserId, string $action): array
     {
@@ -74,6 +83,15 @@ final class MatchInterestService
             }
 
             $this->repo->commit();
+            if (($result['chat_created'] ?? false) === true) {
+                $this->notifications?->emit('mutual_interest_created', $a, $actorUserId, 'match', $matchId, ['chat_id' => $result['chat_id']]);
+                $this->notifications?->emit('mutual_interest_created', $b, $actorUserId, 'match', $matchId, ['chat_id' => $result['chat_id']]);
+
+                if ($this->pdo !== null && !empty($result['chat_id'])) {
+                    $chatService = new ChatService(new ChatRepository($this->pdo), new GoalAwareStarterPromptService());
+                    $chatService->ensureGoalStarterPromptMessages((int)$result['chat_id'], $a, $matchId);
+                }
+            }
 
             return $result;
         } catch (\Throwable $e) {

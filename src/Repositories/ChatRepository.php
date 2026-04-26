@@ -110,4 +110,67 @@ final class ChatRepository
 
         return (int)$this->pdo->lastInsertId();
     }
+
+    public function matchGoalSlugByChatId(int $chatId): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT g.slug
+             FROM chats c
+             JOIN matches m ON m.id = c.match_id
+             JOIN goals g ON g.id = m.goal_id
+             WHERE c.id = :chat_id
+             LIMIT 1"
+        );
+        $stmt->execute(['chat_id' => $chatId]);
+        $slug = $stmt->fetchColumn();
+
+        return $slug === false ? null : (string)$slug;
+    }
+
+    public function chatGoalSlugByMatchId(int $matchId): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT g.slug
+             FROM matches m
+             JOIN goals g ON g.id = m.goal_id
+             WHERE m.id = :match_id
+             LIMIT 1"
+        );
+        $stmt->execute(['match_id' => $matchId]);
+        $slug = $stmt->fetchColumn();
+
+        return $slug === false ? null : (string)$slug;
+    }
+
+    public function hasPromptMessages(int $chatId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) c
+             FROM messages
+             WHERE chat_id = :chat_id
+               AND message_type = 'prompt'"
+        );
+        $stmt->execute(['chat_id' => $chatId]);
+
+        return (int)($stmt->fetch()['c'] ?? 0) > 0;
+    }
+
+    public function insertPromptMessage(int $chatId, int $senderUserId, string $body, string $promptKey): int
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO messages
+                (chat_id, sender_user_id, message_body, message_type, metadata_json, moderation_state, created_at)
+             VALUES
+                (:chat_id, :sender, :body, 'prompt', :metadata_json, 'clean', :created)"
+        );
+        $stmt->execute([
+            'chat_id' => $chatId,
+            'sender' => $senderUserId,
+            'body' => $body,
+            'metadata_json' => json_encode(['source' => 'goal_starter', 'prompt_key' => $promptKey], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'created' => date('Y-m-d H:i:s'),
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
 }

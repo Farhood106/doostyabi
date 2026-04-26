@@ -9,7 +9,9 @@ use App\Core\App;
 use App\Core\Request;
 use App\Core\Response;
 use App\Repositories\Matching\MatchInterestRepository;
+use App\Repositories\NotificationRepository;
 use App\Security\Csrf;
+use App\Services\NotificationService;
 use App\Services\Matching\MatchInterestService;
 use InvalidArgumentException;
 use PDO;
@@ -36,7 +38,11 @@ final class MatchInterestController
 
         try {
             $repo = new MatchInterestRepository($this->app->make(PDO::class));
-            $service = new MatchInterestService($repo);
+            $service = new MatchInterestService(
+                $repo,
+                new NotificationService(new NotificationRepository($this->app->make(PDO::class))),
+                $this->app->make(PDO::class)
+            );
             $result = $service->applyAction($matchId, $userId, $action);
 
             if (($result['match_status'] ?? '') === 'chat_open') {

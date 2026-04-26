@@ -6,6 +6,7 @@ use App\Controllers\AuthController;
 use App\Controllers\ChatController;
 use App\Controllers\DashboardController;
 use App\Controllers\MatchInterestController;
+use App\Controllers\NotificationController;
 use App\Controllers\OnboardingController;
 use App\Controllers\RevealController;
 
@@ -18,6 +19,8 @@ $router->post('/login', [AuthController::class, 'login'], [$guestMiddleware]);
 $router->post('/logout', [AuthController::class, 'logout'], [$authMiddleware]);
 
 $router->get('/dashboard', [DashboardController::class, 'index'], [$authMiddleware]);
+$router->post('/notifications/read', [NotificationController::class, 'markRead'], [$authMiddleware]);
+$router->post('/notifications/read-all', [NotificationController::class, 'markAllRead'], [$authMiddleware]);
 $router->post('/match-interest', [MatchInterestController::class, 'store'], [$authMiddleware]);
 $router->get('/chat', [ChatController::class, 'show'], [$authMiddleware]);
 $router->post('/chat/send', [ChatController::class, 'send'], [$authMiddleware]);

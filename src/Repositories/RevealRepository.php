@@ -107,6 +107,11 @@ final class RevealRepository
 
     public function expirePendingForMatch(int $matchId): void
     {
+        $expiredRows = $this->expiredPendingRowsForMatch($matchId);
+        if ($expiredRows === []) {
+            return;
+        }
+
         $stmt = $this->pdo->prepare(
             "UPDATE reveal_requests
              SET status = 'expired', resolved_at = :resolved
@@ -117,6 +122,20 @@ final class RevealRepository
         );
         $now = date('Y-m-d H:i:s');
         $stmt->execute(['resolved' => $now, 'match_id' => $matchId, 'now' => $now]);
+    }
+
+    public function expiredPendingRowsForMatch(int $matchId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT id, match_id, requested_by_user_id, reveal_type
+             FROM reveal_requests
+             WHERE match_id = :match_id
+               AND status = 'pending'
+               AND expires_at IS NOT NULL
+               AND expires_at < :now"
+        );
+        $stmt->execute(['match_id' => $matchId, 'now' => date('Y-m-d H:i:s')]);
+        return $stmt->fetchAll();
     }
 
     public function pendingRequestsForResponder(int $matchId, int $userId): array

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Matching;
 
 use App\Repositories\Matching\MatchCardRepository;
+use App\Services\NotificationService;
 
 final class MatchCardBuilderService
 {
@@ -25,6 +26,7 @@ final class MatchCardBuilderService
         private readonly DistanceBucketService $distanceBucket,
         private readonly EmotionalSummaryBuilderService $emotionalSummary,
         private readonly int $cardVersion = 1,
+        private readonly ?NotificationService $notifications = null,
     ) {}
 
     public function buildOrRefreshForUser(int $viewerUserId, int $limit = 100): int
@@ -76,6 +78,19 @@ final class MatchCardBuilderService
 
             $this->repo->upsertViewerCard($matchId, $viewerUserId, $payload);
             $this->repo->markQueuePresented((int)$row['id']);
+            if ($this->notifications !== null && (float)$payload['compatibility_score'] >= 82.0) {
+                $this->notifications->emit(
+                    'strong_match_available',
+                    $viewerUserId,
+                    (int)$row['candidate_user_id'],
+                    'match',
+                    $matchId,
+                    [
+                        'compatibility_score' => (float)$payload['compatibility_score'],
+                        'goal_id' => (int)$row['goal_id'],
+                    ]
+                );
+            }
             $count++;
         }
 

@@ -492,6 +492,9 @@ CREATE TABLE notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
   template_id BIGINT UNSIGNED NOT NULL,
+  actor_user_id BIGINT UNSIGNED NULL,
+  entity_type ENUM('match','chat','reveal_request','message','system') NULL,
+  entity_id BIGINT UNSIGNED NULL,
   payload_json JSON NULL COMMENT 'Interpolation values for localized message rendering',
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   send_after DATETIME NULL,
@@ -499,7 +502,9 @@ CREATE TABLE notifications (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_template FOREIGN KEY (template_id) REFERENCES notification_templates(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   KEY idx_notifications_user_read_created (user_id, is_read, created_at),
+  KEY idx_notifications_entity (entity_type, entity_id, created_at),
   KEY idx_notifications_delivery (delivered_at, send_after, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

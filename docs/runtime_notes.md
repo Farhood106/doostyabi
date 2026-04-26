@@ -103,3 +103,26 @@ JOIN no_match_states n2
 - Chat page is intentionally pressure-free: no online status, typing indicator, or seen/read receipts.
 - Main conversation area appears first; progressive reveal is secondary and collapsible.
 - Starter prompts are privacy-safe and currently static i18n keys; they can evolve into goal-driven/admin-managed suggestions later.
+
+## Notification lifecycle (phase 1)
+
+- Notifications are generated in service/business logic (not in templates).
+- Event rules:
+  - `strong_match_available`: emitted when match-card builder creates/refreshes a card with strong score (currently `>= 82`).
+  - `mutual_interest_created`: emitted for both participants when mutual interest opens secure chat.
+  - `reveal_request_received`: emitted to the other participant on request creation.
+  - `reveal_request_accepted` / `reveal_request_declined`: emitted to requester on response.
+  - `reveal_request_cancelled`: emitted to other participant when requester cancels.
+  - `reveal_request_expired`: emitted when pending request expires during panel load/check.
+  - `new_message_received` (lightweight scaffold): emitted to the counterpart on message send.
+- Dashboard loads recent notifications + unread count and allows mark-read / mark-all-read.
+
+## Goal-aware starter prompt strategy (phase 1)
+
+- Starter prompt selection is goal-cluster aware (emotional / activity / collaboration / general fallback).
+- Prompts are key-based i18n text entries (Persian-first), safe for admin-management in later phases.
+- Prompts are privacy-safe:
+  - no exact identity disclosure,
+  - no extracted private profile facts,
+  - no pressure features (seen/typing/online).
+- On chat open, system inserts up to 2 prompt messages once (duplicate-safe via existing prompt-message check).

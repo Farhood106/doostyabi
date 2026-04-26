@@ -8,8 +8,10 @@ use App\Auth\AuthService;
 use App\Core\App;
 use App\Core\Request;
 use App\Core\Response;
+use App\Repositories\NotificationRepository;
 use App\Repositories\RevealRepository;
 use App\Security\Csrf;
+use App\Services\NotificationService;
 use App\Services\RevealService;
 use InvalidArgumentException;
 use PDO;
@@ -103,7 +105,10 @@ final class RevealController
 
     private function service(): RevealService
     {
-        return new RevealService(new RevealRepository($this->app->make(PDO::class)));
+        return new RevealService(
+            new RevealRepository($this->app->make(PDO::class)),
+            new NotificationService(new NotificationRepository($this->app->make(PDO::class)))
+        );
     }
 
     private function authUserId(): int

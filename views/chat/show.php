@@ -2,9 +2,9 @@
 <?php $csrf = app()->make(App\Security\Csrf::class); ?>
 <?php
 $starterPrompts = [
-    t('chat.starter_prompt.1'),
-    t('chat.starter_prompt.2'),
-    t('chat.starter_prompt.3'),
+    t(($starterPromptKeys[0] ?? 'chat.starter_prompt.1')),
+    t(($starterPromptKeys[1] ?? 'chat.starter_prompt.2')),
+    t(($starterPromptKeys[2] ?? 'chat.starter_prompt.3')),
 ];
 $hasMessages = !empty($chat['messages'] ?? []);
 $availableRevealTypes = $revealPanel['available_request_types'] ?? [];

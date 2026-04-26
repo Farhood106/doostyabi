@@ -9,6 +9,8 @@ use App\Services\Matching\AgeLabelBuilderService;
 use App\Services\Matching\DistanceBucketService;
 use App\Services\Matching\EmotionalSummaryBuilderService;
 use App\Services\Matching\MatchCardBuilderService;
+use App\Repositories\NotificationRepository;
+use App\Services\NotificationService;
 
 require __DIR__ . '/../bootstrap/autoload.php';
 
@@ -26,7 +28,8 @@ $builder = new MatchCardBuilderService(
     new AgeLabelBuilderService(),
     new DistanceBucketService(),
     new EmotionalSummaryBuilderService(),
-    1
+    1,
+    new NotificationService(new NotificationRepository($app->make(PDO::class)))
 );
 
 $userLimit = (int)($argv[1] ?? 50);

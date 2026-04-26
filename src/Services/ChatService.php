@@ -9,7 +9,10 @@ use InvalidArgumentException;
 
 final class ChatService
 {
-    public function __construct(private readonly ChatRepository $repo) {}
+    public function __construct(
+        private readonly ChatRepository $repo,
+        private readonly ?GoalAwareStarterPromptService $starterPrompts = null,
+    ) {}
 
     public function openContext(int $userId, ?int $chatId, ?int $matchId): array
     {
@@ -58,5 +61,37 @@ final class ChatService
     {
         $context = $this->openContext($userId, $chatId, null);
         return $this->repo->messagesAfterId((int)$context['chat_id'], max(0, $sinceId), 50);
+    }
+
+    /** @return string[] */
+    public function starterPromptKeysForChat(int $chatId): array
+    {
+        $goalSlug = $this->repo->matchGoalSlugByChatId($chatId);
+        if ($this->starterPrompts === null) {
+            return ['chat.starter_prompt.1', 'chat.starter_prompt.2', 'chat.starter_prompt.3'];
+        }
+
+        return $this->starterPrompts->promptKeysForGoalSlug($goalSlug);
+    }
+
+    public function ensureGoalStarterPromptMessages(int $chatId, int $senderUserId, ?int $matchId = null): void
+    {
+        if ($this->starterPrompts === null) {
+            return;
+        }
+
+        if ($this->repo->hasPromptMessages($chatId)) {
+            return;
+        }
+
+        $goalSlug = $matchId !== null && $matchId > 0
+            ? $this->repo->chatGoalSlugByMatchId($matchId)
+            : $this->repo->matchGoalSlugByChatId($chatId);
+        $keys = $this->starterPrompts->promptKeysForGoalSlug($goalSlug);
+
+        foreach (array_slice($keys, 0, 2) as $key) {
+            $body = function_exists('t') ? (string)\t($key) : (string)$key;
+            $this->repo->insertPromptMessage($chatId, $senderUserId, $body, $key);
+        }
     }
 }

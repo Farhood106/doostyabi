@@ -10,9 +10,12 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Repositories\ChatRepository;
+use App\Repositories\NotificationRepository;
 use App\Repositories\RevealRepository;
 use App\Security\Csrf;
 use App\Services\ChatService;
+use App\Services\GoalAwareStarterPromptService;
+use App\Services\NotificationService;
 use App\Services\RevealService;
 use InvalidArgumentException;
 use PDO;
@@ -32,11 +35,21 @@ final class ChatController
         $matchId = $request->input('match_id') !== null ? (int)$request->input('match_id') : null;
 
         try {
-            $service = new ChatService(new ChatRepository($this->app->make(PDO::class)));
+            $service = new ChatService(new ChatRepository($this->app->make(PDO::class)), new GoalAwareStarterPromptService());
             $chat = $service->openContext($userId, $chatId, $matchId);
-            $revealPanel = (new RevealService(new RevealRepository($this->app->make(PDO::class))))
+            $service->ensureGoalStarterPromptMessages((int)$chat['chat_id'], (int)$chat['user_a_id'], (int)$chat['match_id']);
+            $starterPromptKeys = $service->starterPromptKeysForChat((int)$chat['chat_id']);
+            $revealPanel = (new RevealService(
+                new RevealRepository($this->app->make(PDO::class)),
+                new NotificationService(new NotificationRepository($this->app->make(PDO::class)))
+            ))
                 ->panel((int)$chat['match_id'], $userId);
-            View::render('chat/show', ['chat' => $chat, 'revealPanel' => $revealPanel, 'message' => flashGet('message')]);
+            View::render('chat/show', [
+                'chat' => $chat,
+                'revealPanel' => $revealPanel,
+                'message' => flashGet('message'),
+                'starterPromptKeys' => $starterPromptKeys,
+            ]);
         } catch (InvalidArgumentException) {
             flash('message', 'chat.access_denied');
             Response::redirect('/dashboard');
@@ -60,8 +73,12 @@ final class ChatController
         $body = (string)$request->input('message_body');
 
         try {
-            $service = new ChatService(new ChatRepository($this->app->make(PDO::class)));
+            $service = new ChatService(new ChatRepository($this->app->make(PDO::class)), new GoalAwareStarterPromptService());
+            $context = $service->openContext($userId, $chatId, null);
             $service->sendMessage($userId, $chatId, $body, 'text');
+            $otherUserId = (int)$context['user_a_id'] === $userId ? (int)$context['user_b_id'] : (int)$context['user_a_id'];
+            (new NotificationService(new NotificationRepository($this->app->make(PDO::class))))
+                ->emit('new_message_received', $otherUserId, $userId, 'chat', $chatId, ['message_preview' => mb_substr($body, 0, 80)]);
             flash('message', 'chat.message_sent');
         } catch (InvalidArgumentException $e) {
             flash('message', match ($e->getMessage()) {

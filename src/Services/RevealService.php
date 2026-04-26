@@ -23,7 +23,10 @@ final class RevealService
         'deep_profile' => 'deep_profile_payload_json',
     ];
 
-    public function __construct(private readonly RevealRepository $repo) {}
+    public function __construct(
+        private readonly RevealRepository $repo,
+        private readonly ?NotificationService $notifications = null,
+    ) {}
 
     public function panel(int $matchId, int $userId): array
     {
@@ -32,7 +35,7 @@ final class RevealService
             throw new InvalidArgumentException('forbidden_match');
         }
 
-        $this->repo->expirePendingForMatch($matchId);
+        $this->expireWithNotifications($matchId);
 
         $unlocked = [];
         $requests = $this->repo->unlockedRequestsForViewer($matchId, $userId);
@@ -69,7 +72,7 @@ final class RevealService
             throw new InvalidArgumentException('forbidden_match');
         }
 
-        $this->repo->expirePendingForMatch($matchId);
+        $this->expireWithNotifications($matchId);
 
         if (!isset(self::TYPE_TO_STAGE_FIELD[$revealType])) {
             throw new InvalidArgumentException('invalid_reveal_type');
@@ -99,6 +102,11 @@ final class RevealService
         $expiresAt = date('Y-m-d H:i:s', strtotime('+7 days'));
         $requestId = $this->repo->createRequest($matchId, $requesterUserId, $revealType, $stageRequired, $expiresAt);
         $this->repo->upsertConsent($requestId, $requesterUserId, 'accepted');
+        $otherUserId = (int)$match['user_a_id'] === $requesterUserId ? (int)$match['user_b_id'] : (int)$match['user_a_id'];
+        $this->notifications?->emit('reveal_request_received', $otherUserId, $requesterUserId, 'reveal_request', $requestId, [
+            'match_id' => $matchId,
+            'reveal_type' => $revealType,
+        ]);
 
         return $requestId;
     }
@@ -122,12 +130,20 @@ final class RevealService
         if ($decision === 'accept') {
             $this->repo->upsertConsent($requestId, $actorUserId, 'accepted');
             $this->repo->updateRequestStatus($requestId, 'accepted');
+            $this->notifications?->emit('reveal_request_accepted', (int)$req['requested_by_user_id'], $actorUserId, 'reveal_request', $requestId, [
+                'match_id' => (int)$req['match_id'],
+                'reveal_type' => (string)$req['reveal_type'],
+            ]);
             return;
         }
 
         if ($decision === 'decline') {
             $this->repo->upsertConsent($requestId, $actorUserId, 'declined');
             $this->repo->updateRequestStatus($requestId, 'declined');
+            $this->notifications?->emit('reveal_request_declined', (int)$req['requested_by_user_id'], $actorUserId, 'reveal_request', $requestId, [
+                'match_id' => (int)$req['match_id'],
+                'reveal_type' => (string)$req['reveal_type'],
+            ]);
             return;
         }
 
@@ -146,6 +162,14 @@ final class RevealService
         }
 
         $this->repo->updateRequestStatus($requestId, 'cancelled');
+        $match = $this->repo->matchForUser((int)$req['match_id'], $actorUserId);
+        if ($match) {
+            $otherUserId = (int)$match['user_a_id'] === $actorUserId ? (int)$match['user_b_id'] : (int)$match['user_a_id'];
+            $this->notifications?->emit('reveal_request_cancelled', $otherUserId, $actorUserId, 'reveal_request', $requestId, [
+                'match_id' => (int)$req['match_id'],
+                'reveal_type' => (string)$req['reveal_type'],
+            ]);
+        }
     }
 
     private function isStageAllowed(string $matchStatus, string $requiredStage): bool
@@ -217,5 +241,26 @@ final class RevealService
             return false;
         }
         return $ts < time();
+    }
+
+    private function expireWithNotifications(int $matchId): void
+    {
+        $expiredRows = $this->repo->expiredPendingRowsForMatch($matchId);
+        if ($expiredRows === []) {
+            return;
+        }
+        $this->repo->expirePendingForMatch($matchId);
+
+        foreach ($expiredRows as $row) {
+            $requesterId = (int)$row['requested_by_user_id'];
+            $match = $this->repo->matchForUser($matchId, $requesterId);
+            if (!$match) {
+                continue;
+            }
+            $otherUserId = (int)$match['user_a_id'] === $requesterId ? (int)$match['user_b_id'] : (int)$match['user_a_id'];
+            $payload = ['match_id' => $matchId, 'reveal_type' => (string)$row['reveal_type']];
+            $this->notifications?->emit('reveal_request_expired', $requesterId, null, 'reveal_request', (int)$row['id'], $payload);
+            $this->notifications?->emit('reveal_request_expired', $otherUserId, null, 'reveal_request', (int)$row['id'], $payload);
+        }
     }
 }

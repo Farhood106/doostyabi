@@ -16,6 +16,38 @@ $csrf = app()->make(App\Security\Csrf::class);
 <?php if (!empty($message ?? null)): ?>
     <div class="ok"><?= htmlspecialchars(t((string)$message), ENT_QUOTES, 'UTF-8') ?></div>
 <?php endif; ?>
+<section style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#fafafa;margin-bottom:14px;">
+    <h3 style="margin:0 0 8px 0;"><?= htmlspecialchars(t('dashboard.notifications_title'), ENT_QUOTES, 'UTF-8') ?></h3>
+    <p style="margin-top:0;">
+        <?= htmlspecialchars(t('dashboard.notifications_unread_label'), ENT_QUOTES, 'UTF-8') ?>:
+        <strong><?= (int)($unreadNotifications ?? 0) ?></strong>
+    </p>
+    <form method="post" action="/notifications/read-all" style="margin-bottom:8px;">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+        <button class="btn" type="submit"><?= htmlspecialchars(t('dashboard.notifications_mark_all_read'), ENT_QUOTES, 'UTF-8') ?></button>
+    </form>
+
+    <?php if (empty($notifications ?? [])): ?>
+        <p><?= htmlspecialchars(t('dashboard.notifications_empty'), ENT_QUOTES, 'UTF-8') ?></p>
+    <?php else: ?>
+        <ul>
+            <?php foreach ($notifications as $notification): ?>
+                <li style="margin-bottom:8px;">
+                    <strong><?= htmlspecialchars(t((string)$notification['title_text_key']), ENT_QUOTES, 'UTF-8') ?></strong>
+                    <div><?= htmlspecialchars(t((string)$notification['body_text_key']), ENT_QUOTES, 'UTF-8') ?></div>
+                    <small><?= htmlspecialchars((string)$notification['created_at'], ENT_QUOTES, 'UTF-8') ?></small>
+                    <?php if ((int)$notification['is_read'] === 0): ?>
+                        <form method="post" action="/notifications/read" style="display:inline-block;margin-inline-start:8px;">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="notification_id" value="<?= (int)$notification['id'] ?>">
+                            <button class="btn" type="submit"><?= htmlspecialchars(t('dashboard.notifications_mark_read'), ENT_QUOTES, 'UTF-8') ?></button>
+                        </form>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</section>
 <ul>
     <li><a href="/onboarding/profile"><?= htmlspecialchars(t('onboarding.profile_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
     <li><a href="/onboarding/boundaries"><?= htmlspecialchars(t('onboarding.boundaries_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
