@@ -1,7 +1,9 @@
 <?php ob_start(); $csrf = app()->make(App\Security\Csrf::class); $f = $form ?? []; ?>
 <h2><?= htmlspecialchars(t('onboarding.profile_title'), ENT_QUOTES, 'UTF-8') ?></h2>
+<p><?= htmlspecialchars(t('onboarding.profile_guided_intro'), ENT_QUOTES, 'UTF-8') ?></p>
 <form method="post" action="/onboarding/profile">
 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+<h3><?= htmlspecialchars(t('onboarding.section.identity'), ENT_QUOTES, 'UTF-8') ?></h3>
 <div class="row">
 <label><?= htmlspecialchars(t('onboarding.birth_year'), ENT_QUOTES, 'UTF-8') ?><input type="number" min="1940" max="<?= (int)date('Y') - 18 ?>" name="birth_year" value="<?= htmlspecialchars((string)($f['birth_year'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?php if($e=fieldError($errors ?? [],'birth_year')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 <label><?= htmlspecialchars(t('onboarding.age_min_pref'), ENT_QUOTES, 'UTF-8') ?><select name="age_min_pref"><?php for($a=18;$a<=55;$a++): ?><option value="<?= $a ?>" <?= (string)($f['age_min_pref'] ?? '23') === (string)$a ? 'selected' : '' ?>><?= $a ?></option><?php endfor; ?></select><?php if($e=fieldError($errors ?? [],'age_min_pref')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
@@ -9,6 +11,10 @@
 <label><?= htmlspecialchars(t('onboarding.gender_identity'), ENT_QUOTES, 'UTF-8') ?><select name="gender_identity"><option value="woman" <?= (($f['gender_identity'] ?? 'woman') === 'woman') ? 'selected' : '' ?>><?= htmlspecialchars(t('onboarding.gender.woman'), ENT_QUOTES, 'UTF-8') ?></option><option value="man" <?= (($f['gender_identity'] ?? '') === 'man') ? 'selected' : '' ?>><?= htmlspecialchars(t('onboarding.gender.man'), ENT_QUOTES, 'UTF-8') ?></option></select></label>
 <label><?= htmlspecialchars(t('onboarding.interested_in_gender'), ENT_QUOTES, 'UTF-8') ?><select name="interested_in_gender"><option value="woman" <?= (($f['interested_in_gender'] ?? '') === 'woman') ? 'selected' : '' ?>><?= htmlspecialchars(t('onboarding.gender.woman'), ENT_QUOTES, 'UTF-8') ?></option><option value="man" <?= (($f['interested_in_gender'] ?? '') === 'man') ? 'selected' : '' ?>><?= htmlspecialchars(t('onboarding.gender.man'), ENT_QUOTES, 'UTF-8') ?></option><option value="" <?= (($f['interested_in_gender'] ?? '') === '') ? 'selected' : '' ?>><?= htmlspecialchars(t('onboarding.gender.any'), ENT_QUOTES, 'UTF-8') ?></option></select></label>
 
+</div>
+
+<h3><?= htmlspecialchars(t('onboarding.section.location'), ENT_QUOTES, 'UTF-8') ?></h3>
+<div class="row">
 <label><?= htmlspecialchars(t('onboarding.province'), ENT_QUOTES, 'UTF-8') ?>
     <select name="province" id="province">
         <?php foreach (($provinces ?? []) as $province): ?>
@@ -27,6 +33,10 @@
 </label>
 <label><?= htmlspecialchars(t('onboarding.distance_radius_km'), ENT_QUOTES, 'UTF-8') ?><select name="distance_radius_km"><option value="10" <?= (($f['distance_radius_km'] ?? '')==='10')?'selected':'' ?>>۱۰</option><option value="20" <?= (($f['distance_radius_km'] ?? '')==='20')?'selected':'' ?>>۲۰</option><option value="30" <?= (($f['distance_radius_km'] ?? '30')==='30')?'selected':'' ?>>۳۰</option><option value="50" <?= (($f['distance_radius_km'] ?? '')==='50')?'selected':'' ?>>۵۰</option><option value="80" <?= (($f['distance_radius_km'] ?? '')==='80')?'selected':'' ?>>۸۰</option></select><?php if($e=fieldError($errors ?? [],'distance_radius_km')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 
+</div>
+
+<h3><?= htmlspecialchars(t('onboarding.section.style'), ENT_QUOTES, 'UTF-8') ?></h3>
+<div class="row">
 <label><?= htmlspecialchars(t('onboarding.social_energy'), ENT_QUOTES, 'UTF-8') ?><select name="social_energy"><?php for($v=1;$v<=5;$v++): ?><option value="<?= $v ?>" <?= (string)($f['social_energy'] ?? '3')===(string)$v?'selected':'' ?>><?= htmlspecialchars(t('onboarding.scale.' . $v), ENT_QUOTES, 'UTF-8') ?></option><?php endfor; ?></select><?php if($e=fieldError($errors ?? [],'social_energy')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 <label><?= htmlspecialchars(t('onboarding.communication_style'), ENT_QUOTES, 'UTF-8') ?><select name="communication_style"><?php for($v=1;$v<=5;$v++): ?><option value="<?= $v ?>" <?= (string)($f['communication_style'] ?? '3')===(string)$v?'selected':'' ?>><?= htmlspecialchars(t('onboarding.scale.' . $v), ENT_QUOTES, 'UTF-8') ?></option><?php endfor; ?></select><?php if($e=fieldError($errors ?? [],'communication_style')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 <label><?= htmlspecialchars(t('onboarding.relationship_pace'), ENT_QUOTES, 'UTF-8') ?><select name="relationship_pace"><?php for($v=1;$v<=5;$v++): ?><option value="<?= $v ?>" <?= (string)($f['relationship_pace'] ?? '3')===(string)$v?'selected':'' ?>><?= htmlspecialchars(t('onboarding.scale.' . $v), ENT_QUOTES, 'UTF-8') ?></option><?php endfor; ?></select><?php if($e=fieldError($errors ?? [],'relationship_pace')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
@@ -38,6 +48,7 @@
 <label><?= htmlspecialchars(t('onboarding.smoking_preference'), ENT_QUOTES, 'UTF-8') ?><select name="smoking_preference"><option value="no" <?= (($f['smoking_preference'] ?? 'no')==='no')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.no'), ENT_QUOTES, 'UTF-8') ?></option><option value="occasionally" <?= (($f['smoking_preference'] ?? '')==='occasionally')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.occasionally'), ENT_QUOTES, 'UTF-8') ?></option><option value="yes" <?= (($f['smoking_preference'] ?? '')==='yes')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.yes'), ENT_QUOTES, 'UTF-8') ?></option><option value="prefer_not" <?= (($f['smoking_preference'] ?? '')==='prefer_not')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.prefer_not'), ENT_QUOTES, 'UTF-8') ?></option></select><?php if($e=fieldError($errors ?? [],'smoking_preference')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 <label><?= htmlspecialchars(t('onboarding.drinking_preference'), ENT_QUOTES, 'UTF-8') ?><select name="drinking_preference"><option value="no" <?= (($f['drinking_preference'] ?? 'no')==='no')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.no'), ENT_QUOTES, 'UTF-8') ?></option><option value="occasionally" <?= (($f['drinking_preference'] ?? '')==='occasionally')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.occasionally'), ENT_QUOTES, 'UTF-8') ?></option><option value="yes" <?= (($f['drinking_preference'] ?? '')==='yes')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.yes'), ENT_QUOTES, 'UTF-8') ?></option><option value="prefer_not" <?= (($f['drinking_preference'] ?? '')==='prefer_not')?'selected':'' ?>><?= htmlspecialchars(t('onboarding.preference.prefer_not'), ENT_QUOTES, 'UTF-8') ?></option></select><?php if($e=fieldError($errors ?? [],'drinking_preference')):?><div class="err"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif;?></label>
 </div>
+<h3><?= htmlspecialchars(t('onboarding.section.optional_text'), ENT_QUOTES, 'UTF-8') ?></h3>
 <label><?= htmlspecialchars(t('onboarding.about_me'), ENT_QUOTES, 'UTF-8') ?><textarea name="about_me"><?= htmlspecialchars((string)($f['about_me'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea></label>
 <label><?= htmlspecialchars(t('onboarding.looking_for'), ENT_QUOTES, 'UTF-8') ?><textarea name="looking_for"><?= htmlspecialchars((string)($f['looking_for'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea></label>
 <button class="btn" type="submit"><?= htmlspecialchars(t('common.save_continue'), ENT_QUOTES, 'UTF-8') ?></button>

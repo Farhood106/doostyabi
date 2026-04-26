@@ -166,3 +166,31 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
        OR (mc_new.compatibility_score = mc_old.compatibility_score AND mc_new.updated_at = mc_old.updated_at AND mc_new.id > mc_old.id)
   );
 ```
+
+## Onboarding flow (guided, goal-driven MVP)
+
+- Guided step order:
+  1) basic profile (identity basics, age/birth-year, location, interest and preferred age range),
+  2) main goal selection,
+  3) goal-specific question set for selected goals.
+- Goal-specific questions are item-based (select/radio) and persisted in dynamic tables:
+  - definitions: `goal_preference_definitions`,
+  - user answers: `user_goal_preferences`.
+- Current implementation validates required goal-specific answers and restores saved values on revisit.
+
+## Boundary storage decision (bug fix)
+
+- Root cause: schema uniqueness was `(user_id, boundary_key)`, but product allows multiple items in same boundary category (same `boundary_key`, different `boundary_value`).
+- Decision: use unique key `(user_id, boundary_key, boundary_value)` to keep category grouping and allow multiple selections safely.
+- Repository write path now uses transaction-wrapped replace to avoid partial writes on failure.
+
+### One-time migration for existing deployments
+
+- If your database was created before this fix, apply:
+  - `database/migrations/2026_04_26_fix_profile_boundaries_unique_key.sql`
+- This migration updates the unique index on `profile_boundaries` and prevents duplicate-key failures when users choose multiple boundary items under one category.
+
+## Next matching phase for goal answers
+
+- Current phase stores and reads goal-specific preferences reliably.
+- Next phase should incorporate selected preference answers into compatibility scoring weights per goal cluster.

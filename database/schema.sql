@@ -111,7 +111,7 @@ CREATE TABLE profile_boundaries (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_profile_boundaries_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_profile_boundary (user_id, boundary_key),
+  UNIQUE KEY uq_profile_boundary (user_id, boundary_key, boundary_value),
   KEY idx_profile_boundaries_key_value (boundary_key, boundary_value, importance)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -48,11 +48,20 @@ final class OnboardingRepository
 
     public function replaceBoundaries(int $userId, array $rows): void
     {
-        $this->pdo->prepare('DELETE FROM profile_boundaries WHERE user_id = :uid')->execute(['uid' => $userId]);
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->prepare('DELETE FROM profile_boundaries WHERE user_id = :uid')->execute(['uid' => $userId]);
 
-        $stmt = $this->pdo->prepare('INSERT INTO profile_boundaries (user_id, boundary_key, boundary_value, importance, created_at, updated_at) VALUES (:uid, :k, :v, :i, NOW(), NOW())');
-        foreach ($rows as $row) {
-            $stmt->execute(['uid' => $userId, 'k' => $row['key'], 'v' => $row['value'], 'i' => $row['importance']]);
+            $stmt = $this->pdo->prepare('INSERT INTO profile_boundaries (user_id, boundary_key, boundary_value, importance, created_at, updated_at) VALUES (:uid, :k, :v, :i, NOW(), NOW())');
+            foreach ($rows as $row) {
+                $stmt->execute(['uid' => $userId, 'k' => $row['key'], 'v' => $row['value'], 'i' => $row['importance']]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -154,5 +163,130 @@ final class OnboardingRepository
     {
         $stmt = $this->pdo->prepare('UPDATE profiles SET profile_completed_at = NOW(), updated_at = NOW() WHERE user_id = :uid');
         $stmt->execute(['uid' => $userId]);
+    }
+
+    public function goalPreferenceDefinitions(array $goalIds): array
+    {
+        if ($goalIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($goalIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT id, goal_id, pref_key, label_key, helper_text_key, input_type, value_type, allowed_values_json, is_required
+             FROM goal_preference_definitions
+             WHERE is_active = 1
+               AND goal_id IN ($placeholders)
+             ORDER BY goal_id ASC, id ASC"
+        );
+        $stmt->execute($goalIds);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$row) {
+            $row['allowed_values'] = json_decode((string)($row['allowed_values_json'] ?? '[]'), true) ?? [];
+        }
+
+        return $rows;
+    }
+
+    public function replaceGoalPreferenceValues(int $userId, array $valuesByGoalAndPref): void
+    {
+        $userGoalStmt = $this->pdo->prepare('SELECT id, goal_id FROM user_goals WHERE user_id = :uid AND status = :status');
+        $userGoalStmt->execute(['uid' => $userId, 'status' => 'active']);
+        $goalToUserGoalId = [];
+        foreach ($userGoalStmt->fetchAll() as $row) {
+            $goalToUserGoalId[(int)$row['goal_id']] = (int)$row['id'];
+        }
+
+        if ($goalToUserGoalId === []) {
+            return;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            if ($this->isSqlite()) {
+                $delete = $this->pdo->prepare(
+                    'DELETE FROM user_goal_preferences
+                     WHERE user_goal_id IN (SELECT id FROM user_goals WHERE user_id = :uid)'
+                );
+            } else {
+                $delete = $this->pdo->prepare(
+                    'DELETE ugp FROM user_goal_preferences ugp
+                     JOIN user_goals ug ON ug.id = ugp.user_goal_id
+                     WHERE ug.user_id = :uid'
+                );
+            }
+            $delete->execute(['uid' => $userId]);
+
+            $defStmt = $this->pdo->prepare(
+                'SELECT id FROM goal_preference_definitions
+                 WHERE goal_id = :goal_id
+                   AND pref_key = :pref_key
+                   AND is_active = 1
+                 LIMIT 1'
+            );
+            $insert = $this->pdo->prepare(
+                'INSERT INTO user_goal_preferences (user_goal_id, preference_def_id, value_string, value_number, value_bool, value_json, created_at, updated_at)
+                 VALUES (:user_goal_id, :def_id, :value_string, NULL, NULL, NULL, :created_at, :updated_at)'
+            );
+            $now = date('Y-m-d H:i:s');
+
+            foreach ($valuesByGoalAndPref as $goalIdRaw => $prefValues) {
+                $goalId = (int)$goalIdRaw;
+                if (!isset($goalToUserGoalId[$goalId]) || !is_array($prefValues)) {
+                    continue;
+                }
+                foreach ($prefValues as $prefKey => $value) {
+                    $prefKey = trim((string)$prefKey);
+                    $value = trim((string)$value);
+                    if ($prefKey === '' || $value === '') {
+                        continue;
+                    }
+                    $defStmt->execute(['goal_id' => $goalId, 'pref_key' => $prefKey]);
+                    $defId = $defStmt->fetchColumn();
+                    if ($defId === false) {
+                        continue;
+                    }
+                    $insert->execute([
+                        'user_goal_id' => $goalToUserGoalId[$goalId],
+                        'def_id' => (int)$defId,
+                        'value_string' => $value,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    public function getGoalPreferenceValuesForUser(int $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT ug.goal_id, gpd.pref_key, ugp.value_string
+             FROM user_goal_preferences ugp
+             JOIN user_goals ug ON ug.id = ugp.user_goal_id
+             JOIN goal_preference_definitions gpd ON gpd.id = ugp.preference_def_id
+             WHERE ug.user_id = :uid'
+        );
+        $stmt->execute(['uid' => $userId]);
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $goalId = (int)$row['goal_id'];
+            $prefKey = (string)$row['pref_key'];
+            $result[$goalId][$prefKey] = (string)$row['value_string'];
+        }
+
+        return $result;
+    }
+
+    private function isSqlite(): bool
+    {
+        return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
     }
 }

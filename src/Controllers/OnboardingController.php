@@ -397,6 +397,8 @@ final class OnboardingController
         $this->validateCsrf($request, '/onboarding/goals');
         $goalIds = array_values(array_unique(array_map('intval', (array)$request->input('goal_ids', []))));
         $_SESSION['_old']['goal_ids'] = $goalIds;
+        $goalPreferences = (array)($request->input('goal_pref') ?? []);
+        $_SESSION['_old']['goal_pref'] = $goalPreferences;
 
         if (count($goalIds) === 0) {
             flash('errors', ['goal_ids' => ['validation.goal_selection_required']]);
@@ -414,6 +416,13 @@ final class OnboardingController
         try {
             $uid = $this->userId();
             $repo->replaceGoals($uid, $goalIds);
+            $definitions = $repo->goalPreferenceDefinitions($goalIds);
+            $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences);
+            if ($prefErrors !== []) {
+                flash('errors', $prefErrors);
+                Response::redirect('/onboarding/goals');
+            }
+            $repo->replaceGoalPreferenceValues($uid, $goalPreferences);
             $repo->markProfileCompleted($uid);
         } catch (Throwable $e) {
             $this->logException($e, 'onboarding.goals');
@@ -729,9 +738,13 @@ final class OnboardingController
     private function goalsViewData(array $goals): array
     {
         $savedGoalIds = $this->app->make(OnboardingRepository::class)->getActiveGoalIdsForUser($this->userId());
+        $repo = $this->app->make(OnboardingRepository::class);
         $selectedGoalIds = $this->hasOldInput('goal_ids')
             ? array_values(array_unique(array_map('intval', (array)$this->oldInput('goal_ids', []))))
             : $savedGoalIds;
+        $savedPrefValues = $repo->getGoalPreferenceValuesForUser($this->userId());
+        $prefValues = $this->hasOldInput('goal_pref') ? (array)$this->oldInput('goal_pref', []) : $savedPrefValues;
+        $definitions = $repo->goalPreferenceDefinitions($selectedGoalIds !== [] ? $selectedGoalIds : $savedGoalIds);
 
         $groups = [];
         foreach ($goals as $goal) {
@@ -755,7 +768,33 @@ final class OnboardingController
         return $this->viewData() + [
             'goalGroups' => $ordered,
             'selectedGoalIds' => $selectedGoalIds,
+            'goalPreferenceDefinitions' => $definitions,
+            'goalPreferenceValues' => $prefValues,
         ];
+    }
+
+    private function validateGoalPreferenceAnswers(array $definitions, array $input): array
+    {
+        $errors = [];
+        foreach ($definitions as $def) {
+            $goalId = (int)$def['goal_id'];
+            $prefKey = (string)$def['pref_key'];
+            $isRequired = (int)($def['is_required'] ?? 0) === 1;
+            $allowed = array_values(array_filter((array)($def['allowed_values'] ?? []), static fn(mixed $v): bool => is_string($v) && trim($v) !== ''));
+            $value = trim((string)($input[$goalId][$prefKey] ?? ''));
+
+            if ($value === '') {
+                if ($isRequired) {
+                    $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_required';
+                }
+                continue;
+            }
+            if ($allowed !== [] && !in_array($value, $allowed, true)) {
+                $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_invalid';
+            }
+        }
+
+        return $errors;
     }
 
     private function flatBoundaryItems(): array
