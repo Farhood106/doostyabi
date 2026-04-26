@@ -1,118 +1,176 @@
 <?php ob_start(); ?>
 <?php $csrf = app()->make(App\Security\Csrf::class); ?>
-<h2><?= htmlspecialchars(t('chat.title'), ENT_QUOTES, 'UTF-8') ?></h2>
-<p><?= htmlspecialchars(t('chat.privacy_note'), ENT_QUOTES, 'UTF-8') ?></p>
+<?php
+$starterPrompts = [
+    t('chat.starter_prompt.1'),
+    t('chat.starter_prompt.2'),
+    t('chat.starter_prompt.3'),
+];
+$hasMessages = !empty($chat['messages'] ?? []);
+$availableRevealTypes = $revealPanel['available_request_types'] ?? [];
+?>
+
+<h2><?= htmlspecialchars(t('chat.secure_title'), ENT_QUOTES, 'UTF-8') ?></h2>
+<p><?= htmlspecialchars(t('chat.privacy_note_long'), ENT_QUOTES, 'UTF-8') ?></p>
+
+<?php if (!empty($chat['match_id'] ?? null)): ?>
+    <div style="display:inline-block;padding:6px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb;margin-bottom:12px;">
+        <strong><?= htmlspecialchars(t('chat.match_context_badge'), ENT_QUOTES, 'UTF-8') ?>:</strong>
+        #<?= (int)$chat['match_id'] ?>
+    </div>
+<?php endif; ?>
+
 <?php if (!empty($message ?? null)): ?>
     <div class="ok"><?= htmlspecialchars(t((string)$message), ENT_QUOTES, 'UTF-8') ?></div>
 <?php endif; ?>
 
-<h3><?= htmlspecialchars(t('reveal.title'), ENT_QUOTES, 'UTF-8') ?></h3>
-<div>
-    <p><?= htmlspecialchars(t('reveal.request_prompt'), ENT_QUOTES, 'UTF-8') ?></p>
-    <form method="post" action="/reveal/request" style="display:flex;gap:8px;align-items:center;">
-        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
-        <input type="hidden" name="match_id" value="<?= (int)$chat['match_id'] ?>">
-        <select name="reveal_type">
-            <?php foreach (($revealPanel['available_request_types'] ?? []) as $type): ?>
-                <option value="<?= htmlspecialchars((string)$type, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('reveal.type.' . (string)$type), ENT_QUOTES, 'UTF-8') ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button class="btn" type="submit" <?= empty($revealPanel['available_request_types'] ?? []) ? 'disabled' : '' ?>><?= htmlspecialchars(t('reveal.request_submit'), ENT_QUOTES, 'UTF-8') ?></button>
-    </form>
-    <?php if (empty($revealPanel['available_request_types'] ?? [])): ?>
-        <small><?= htmlspecialchars(t('reveal.none_available'), ENT_QUOTES, 'UTF-8') ?></small>
+<section style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:14px;background:#fafafa;">
+    <h3 style="margin-top:0;"><?= htmlspecialchars(t('chat.starter_title'), ENT_QUOTES, 'UTF-8') ?></h3>
+    <p style="margin-top:0;"><?= htmlspecialchars(t('chat.starter_helper'), ENT_QUOTES, 'UTF-8') ?></p>
+    <ul style="padding-right:20px; margin-bottom:0;">
+        <?php foreach ($starterPrompts as $index => $prompt): ?>
+            <li style="margin-bottom:8px;">
+                <span><?= htmlspecialchars($prompt, ENT_QUOTES, 'UTF-8') ?></span>
+                <button
+                    class="btn"
+                    type="button"
+                    data-starter-insert="<?= htmlspecialchars($prompt, ENT_QUOTES, 'UTF-8') ?>"
+                    style="margin-right:8px;"
+                >
+                    <?= htmlspecialchars(t('chat.starter_use_button'), ENT_QUOTES, 'UTF-8') ?>
+                </button>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</section>
+
+<div id="messages" style="border:1px solid #ddd;padding:12px;max-height:420px;overflow:auto;border-radius:8px;margin-bottom:12px;">
+    <?php if (!$hasMessages): ?>
+        <div data-empty-state="1" style="color:#6b7280;"><?= htmlspecialchars(t('chat.empty_messages'), ENT_QUOTES, 'UTF-8') ?></div>
+    <?php else: ?>
+        <?php foreach (($chat['messages'] ?? []) as $m): ?>
+            <div data-id="<?= (int)$m['id'] ?>" style="margin-bottom:10px;">
+                <small><?= htmlspecialchars((string)$m['created_at'], ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(t('chat.message_type.' . (string)$m['message_type']), ENT_QUOTES, 'UTF-8') ?></small>
+                <div><?= nl2br(htmlspecialchars((string)$m['message_body'], ENT_QUOTES, 'UTF-8')) ?></div>
+            </div>
+        <?php endforeach; ?>
     <?php endif; ?>
 </div>
 
-<?php if (!empty($revealPanel['pending_incoming'] ?? [])): ?>
-    <h4><?= htmlspecialchars(t('reveal.pending_incoming'), ENT_QUOTES, 'UTF-8') ?></h4>
-    <ul>
-        <?php foreach ($revealPanel['pending_incoming'] as $req): ?>
-            <li>
-                <?= htmlspecialchars(t('reveal.type.' . (string)$req['reveal_type']), ENT_QUOTES, 'UTF-8') ?>
-                <form method="post" action="/reveal/respond" style="display:inline-block;">
-                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
-                    <input type="hidden" name="request_id" value="<?= (int)$req['id'] ?>">
-                    <button class="btn" type="submit" name="decision" value="accept"><?= htmlspecialchars(t('reveal.accept'), ENT_QUOTES, 'UTF-8') ?></button>
-                    <button class="btn" type="submit" name="decision" value="decline"><?= htmlspecialchars(t('reveal.decline'), ENT_QUOTES, 'UTF-8') ?></button>
-                </form>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-<?php endif; ?>
+<form method="post" action="/chat/send" style="margin-bottom:18px;">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+    <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
+    <textarea id="message_body" name="message_body" rows="3" required maxlength="2000" placeholder="<?= htmlspecialchars(t('chat.composer_placeholder'), ENT_QUOTES, 'UTF-8') ?>" style="width:100%;box-sizing:border-box;"></textarea>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">
+        <small style="color:#6b7280;"><?= htmlspecialchars(t('chat.composer_note'), ENT_QUOTES, 'UTF-8') ?></small>
+        <button class="btn" type="submit"><?= htmlspecialchars(t('chat.composer_send_button'), ENT_QUOTES, 'UTF-8') ?></button>
+    </div>
+</form>
 
-<?php if (!empty($revealPanel['pending_outgoing'] ?? [])): ?>
-    <h4><?= htmlspecialchars(t('reveal.pending_outgoing'), ENT_QUOTES, 'UTF-8') ?></h4>
-    <ul>
-        <?php foreach ($revealPanel['pending_outgoing'] as $req): ?>
-            <li>
-                <?= htmlspecialchars(t('reveal.type.' . (string)$req['reveal_type']), ENT_QUOTES, 'UTF-8') ?>
-                <form method="post" action="/reveal/cancel" style="display:inline-block;">
-                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
-                    <input type="hidden" name="request_id" value="<?= (int)$req['id'] ?>">
-                    <button class="btn" type="submit"><?= htmlspecialchars(t('reveal.cancel'), ENT_QUOTES, 'UTF-8') ?></button>
-                </form>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-<?php endif; ?>
+<details style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#fcfcfd;">
+    <summary style="cursor:pointer;font-weight:600;"><?= htmlspecialchars(t('reveal.secondary_title'), ENT_QUOTES, 'UTF-8') ?></summary>
+    <p><?= htmlspecialchars(t('reveal.secondary_helper_1'), ENT_QUOTES, 'UTF-8') ?></p>
+    <p><?= htmlspecialchars(t('reveal.secondary_helper_2'), ENT_QUOTES, 'UTF-8') ?></p>
 
-<?php if (!empty($revealPanel['unlocked'] ?? [])): ?>
-    <h4><?= htmlspecialchars(t('reveal.unlocked'), ENT_QUOTES, 'UTF-8') ?></h4>
-    <ul>
-        <?php foreach ($revealPanel['unlocked'] as $item): ?>
-            <li>
-                <strong><?= htmlspecialchars(t('reveal.type.' . (string)$item['reveal_type']), ENT_QUOTES, 'UTF-8') ?>:</strong>
-                <?php $type = (string)$item['reveal_type']; ?>
-                <?php if ($type === 'first_name'): ?>
-                    <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
-                <?php elseif ($type === 'photo'): ?>
-                    <?php $photo = trim((string)$item['value']); ?>
-                    <?php if ($photo !== ''): ?>
-                        <img src="<?= htmlspecialchars($photo, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars(t('reveal.type.photo'), ENT_QUOTES, 'UTF-8') ?>" style="max-width:220px;max-height:220px;object-fit:cover;">
-                    <?php endif; ?>
-                <?php elseif ($type === 'contact_info' || $type === 'deep_profile'): ?>
-                    <?php $decoded = json_decode((string)$item['value'], true); ?>
-                    <?php if (is_array($decoded)): ?>
-                        <ul>
-                            <?php foreach ($decoded as $k => $v): ?>
-                                <li><strong><?= htmlspecialchars((string)$k, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= htmlspecialchars(is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></li>
-                            <?php endforeach; ?>
-                        </ul>
+    <?php if (!empty($availableRevealTypes)): ?>
+        <form method="post" action="/reveal/request" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
+            <input type="hidden" name="match_id" value="<?= (int)$chat['match_id'] ?>">
+            <select name="reveal_type">
+                <?php foreach ($availableRevealTypes as $type): ?>
+                    <option value="<?= htmlspecialchars((string)$type, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars(t('reveal.type.' . (string)$type), ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button class="btn" type="submit"><?= htmlspecialchars(t('reveal.request_submit'), ENT_QUOTES, 'UTF-8') ?></button>
+        </form>
+    <?php else: ?>
+        <small><?= htmlspecialchars(t('reveal.secondary_empty_state'), ENT_QUOTES, 'UTF-8') ?></small>
+    <?php endif; ?>
+
+    <?php if (!empty($revealPanel['pending_incoming'] ?? [])): ?>
+        <h4><?= htmlspecialchars(t('reveal.pending_incoming'), ENT_QUOTES, 'UTF-8') ?></h4>
+        <ul>
+            <?php foreach ($revealPanel['pending_incoming'] as $req): ?>
+                <li>
+                    <?= htmlspecialchars(t('reveal.type.' . (string)$req['reveal_type']), ENT_QUOTES, 'UTF-8') ?>
+                    <form method="post" action="/reveal/respond" style="display:inline-block;">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
+                        <input type="hidden" name="request_id" value="<?= (int)$req['id'] ?>">
+                        <button class="btn" type="submit" name="decision" value="accept"><?= htmlspecialchars(t('reveal.accept'), ENT_QUOTES, 'UTF-8') ?></button>
+                        <button class="btn" type="submit" name="decision" value="decline"><?= htmlspecialchars(t('reveal.decline'), ENT_QUOTES, 'UTF-8') ?></button>
+                    </form>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <?php if (!empty($revealPanel['pending_outgoing'] ?? [])): ?>
+        <h4><?= htmlspecialchars(t('reveal.pending_outgoing'), ENT_QUOTES, 'UTF-8') ?></h4>
+        <ul>
+            <?php foreach ($revealPanel['pending_outgoing'] as $req): ?>
+                <li>
+                    <?= htmlspecialchars(t('reveal.type.' . (string)$req['reveal_type']), ENT_QUOTES, 'UTF-8') ?>
+                    <form method="post" action="/reveal/cancel" style="display:inline-block;">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
+                        <input type="hidden" name="request_id" value="<?= (int)$req['id'] ?>">
+                        <button class="btn" type="submit"><?= htmlspecialchars(t('reveal.cancel'), ENT_QUOTES, 'UTF-8') ?></button>
+                    </form>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+
+    <?php if (!empty($revealPanel['unlocked'] ?? [])): ?>
+        <h4><?= htmlspecialchars(t('reveal.unlocked'), ENT_QUOTES, 'UTF-8') ?></h4>
+        <ul>
+            <?php foreach ($revealPanel['unlocked'] as $item): ?>
+                <li>
+                    <strong><?= htmlspecialchars(t('reveal.type.' . (string)$item['reveal_type']), ENT_QUOTES, 'UTF-8') ?>:</strong>
+                    <?php $type = (string)$item['reveal_type']; ?>
+                    <?php if ($type === 'first_name'): ?>
+                        <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php elseif ($type === 'photo'): ?>
+                        <?php $photo = trim((string)$item['value']); ?>
+                        <?php if ($photo !== ''): ?>
+                            <img src="<?= htmlspecialchars($photo, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars(t('reveal.type.photo'), ENT_QUOTES, 'UTF-8') ?>" style="max-width:220px;max-height:220px;object-fit:cover;">
+                        <?php endif; ?>
+                    <?php elseif ($type === 'contact_info' || $type === 'deep_profile'): ?>
+                        <?php $decoded = json_decode((string)$item['value'], true); ?>
+                        <?php if (is_array($decoded)): ?>
+                            <ul>
+                                <?php foreach ($decoded as $k => $v): ?>
+                                    <li><strong><?= htmlspecialchars((string)$k, ENT_QUOTES, 'UTF-8') ?>:</strong> <?= htmlspecialchars(is_scalar($v) ? (string)$v : json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
+                        <?php endif; ?>
                     <?php else: ?>
                         <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
                     <?php endif; ?>
-                <?php else: ?>
-                    <?= htmlspecialchars((string)$item['value'], ENT_QUOTES, 'UTF-8') ?>
-                <?php endif; ?>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-<?php endif; ?>
-
-<div id="messages" style="border:1px solid #ddd;padding:12px;max-height:400px;overflow:auto;">
-    <?php foreach (($chat['messages'] ?? []) as $m): ?>
-        <div data-id="<?= (int)$m['id'] ?>" style="margin-bottom:10px;">
-            <small><?= htmlspecialchars((string)$m['created_at'], ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(t('chat.message_type.' . (string)$m['message_type']), ENT_QUOTES, 'UTF-8') ?></small>
-            <div><?= nl2br(htmlspecialchars((string)$m['message_body'], ENT_QUOTES, 'UTF-8')) ?></div>
-        </div>
-    <?php endforeach; ?>
-</div>
-
-<form method="post" action="/chat/send">
-    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
-    <input type="hidden" name="chat_id" value="<?= (int)$chat['chat_id'] ?>">
-    <label><?= htmlspecialchars(t('chat.message_label'), ENT_QUOTES, 'UTF-8') ?></label>
-    <textarea name="message_body" rows="3" required maxlength="2000"></textarea>
-    <button class="btn" type="submit"><?= htmlspecialchars(t('chat.send'), ENT_QUOTES, 'UTF-8') ?></button>
-</form>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</details>
 
 <script>
 (function () {
   const box = document.getElementById('messages');
+  const composer = document.getElementById('message_body');
+  const insertButtons = document.querySelectorAll('[data-starter-insert]');
+
+  for (const btn of insertButtons) {
+    btn.addEventListener('click', function () {
+      if (!composer) return;
+      composer.value = String(btn.getAttribute('data-starter-insert') || '');
+      composer.focus();
+    });
+  }
+
   if (!box) return;
 
   function latestId() {
@@ -132,6 +190,9 @@
       if (!data.messages || !Array.isArray(data.messages)) return;
 
       for (const m of data.messages) {
+        const empty = box.querySelector('[data-empty-state="1"]');
+        if (empty) empty.remove();
+
         const div = document.createElement('div');
         div.setAttribute('data-id', String(m.id));
         div.style.marginBottom = '10px';

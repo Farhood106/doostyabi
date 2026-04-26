@@ -97,3 +97,9 @@ JOIN no_match_states n2
 - Repository queries are written with unique placeholder names per occurrence (e.g., `:uid_a`, `:uid_b`) even when bound to the same runtime value.
 - Verification fixtures force native behavior and include a static SQL placeholder audit:
   - `php bin/verify_pdo_placeholder_safety.php`
+
+## Chat UX principles (MVP)
+
+- Chat page is intentionally pressure-free: no online status, typing indicator, or seen/read receipts.
+- Main conversation area appears first; progressive reveal is secondary and collapsible.
+- Starter prompts are privacy-safe and currently static i18n keys; they can evolve into goal-driven/admin-managed suggestions later.
