@@ -152,8 +152,9 @@ final class MatchCardRepository
         return (int)$existing['id'];
     }
 
-    public function upsertViewerCard(int $matchId, int $viewerUserId, array $payload): void
+    public function upsertViewerCard(int $matchId, int $viewerUserId, array $payload): array
     {
+        $existing = $this->existingCardForViewerMatch($matchId, $viewerUserId);
         $sql = "INSERT INTO match_cards
                 (match_id, viewer_user_id, age_range_label_key, approx_distance_bucket, compatibility_score, emotional_summary_key, match_reasons_json, communication_boundaries_json, schedule_overlap_key, card_version, created_at, updated_at)
             VALUES
@@ -199,6 +200,12 @@ final class MatchCardRepository
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        return [
+            'was_created' => $existing === null,
+            'previous_score' => $existing === null ? null : (float)$existing['compatibility_score'],
+            'card_id' => $existing === null ? (int)$this->pdo->lastInsertId() : (int)$existing['id'],
+        ];
     }
 
     public function markQueuePresented(int $rowId): void
@@ -220,6 +227,7 @@ final class MatchCardRepository
                     mc.schedule_overlap_key, mc.card_version, mc.updated_at,
                     m.status AS match_status,
                     c.id AS chat_id,
+                    CASE WHEN m.user_a_id = mc.viewer_user_id THEN m.user_b_id ELSE m.user_a_id END AS counterpart_user_id,
                     COALESCE(mis.current_interest, 'none') AS viewer_interest
              FROM match_cards mc
              JOIN matches m ON m.id = mc.match_id
@@ -228,6 +236,8 @@ final class MatchCardRepository
                     ON mis.match_id = mc.match_id
                    AND mis.user_id = mc.viewer_user_id
              WHERE mc.viewer_user_id = :uid
+               AND (m.user_a_id = mc.viewer_user_id OR m.user_b_id = mc.viewer_user_id)
+               AND m.user_a_id <> m.user_b_id
                AND m.status IN ('suggested', 'interested_one_side', 'mutual', 'chat_open')
                AND COALESCE(mis.current_interest, 'none') <> 'passed'
              ORDER BY mc.compatibility_score DESC, mc.updated_at DESC, mc.id DESC
@@ -250,5 +260,14 @@ final class MatchCardRepository
     private function isSqlite(): bool
     {
         return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    }
+
+    private function existingCardForViewerMatch(int $matchId, int $viewerUserId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT id, compatibility_score FROM match_cards WHERE match_id = :match_id AND viewer_user_id = :viewer_user_id LIMIT 1');
+        $stmt->execute(['match_id' => $matchId, 'viewer_user_id' => $viewerUserId]);
+        $row = $stmt->fetch();
+
+        return $row ?: null;
     }
 }

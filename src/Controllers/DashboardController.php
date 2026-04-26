@@ -28,7 +28,7 @@ final class DashboardController
             $repo = new MatchCardRepository($this->app->make(PDO::class));
             $cards = (new MatchDeliveryService($repo))->cardsForViewer($userId, 20, 0);
             $notificationService = new NotificationService(new NotificationRepository($this->app->make(PDO::class)));
-            $notifications = $notificationService->recentForUser($userId, 10);
+            $notifications = array_map(fn(array $n): array => $this->withAction($n), $notificationService->recentForUser($userId, 10));
             $unreadNotifications = $notificationService->unreadCount($userId);
         }
 
@@ -38,5 +38,41 @@ final class DashboardController
             'notifications' => $notifications,
             'unreadNotifications' => $unreadNotifications,
         ]);
+    }
+
+    private function withAction(array $notification): array
+    {
+        $templateKey = (string)($notification['template_key'] ?? '');
+        $entityType = (string)($notification['entity_type'] ?? '');
+        $entityId = isset($notification['entity_id']) ? (int)$notification['entity_id'] : null;
+        $payload = is_array($notification['payload'] ?? null) ? $notification['payload'] : [];
+
+        $notification['action_url'] = null;
+        $notification['action_label_key'] = null;
+
+        if ($templateKey === 'notification.strong_match_available' && $entityType === 'match' && $entityId !== null) {
+            $notification['action_url'] = '/dashboard#match-' . $entityId;
+            $notification['action_label_key'] = 'dashboard.notifications.action.view_match';
+            return $notification;
+        }
+
+        if ($templateKey === 'notification.mutual_interest_created' && isset($payload['chat_id'])) {
+            $notification['action_url'] = '/chat?chat_id=' . (int)$payload['chat_id'];
+            $notification['action_label_key'] = 'dashboard.notifications.action.open_chat';
+            return $notification;
+        }
+
+        if (in_array($templateKey, ['notification.reveal_request_received', 'notification.reveal_request_accepted', 'notification.reveal_request_declined', 'notification.reveal_request_cancelled', 'notification.reveal_request_expired'], true) && isset($payload['match_id'])) {
+            $notification['action_url'] = '/chat?match_id=' . (int)$payload['match_id'];
+            $notification['action_label_key'] = 'dashboard.notifications.action.open_reveal';
+            return $notification;
+        }
+
+        if ($templateKey === 'notification.new_message_received' && $entityType === 'chat' && $entityId !== null) {
+            $notification['action_url'] = '/chat?chat_id=' . $entityId;
+            $notification['action_label_key'] = 'dashboard.notifications.action.open_chat';
+        }
+
+        return $notification;
     }
 }

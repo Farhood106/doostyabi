@@ -14,6 +14,7 @@ use App\Services\Matching\AgeLabelBuilderService;
 use App\Services\Matching\DistanceBucketService;
 use App\Services\Matching\EmotionalSummaryBuilderService;
 use App\Services\Matching\MatchCardBuilderService;
+use App\Services\Matching\MatchDeliveryService;
 use App\Services\Matching\MatchInterestService;
 use App\Services\NotificationService;
 use App\Services\RevealService;
@@ -64,18 +65,27 @@ foreach ($templates as [$key, $cat]) {
 }
 
 $pdo->exec("INSERT INTO users (id,status) VALUES (1,'active'),(2,'active'),(3,'active')");
-$pdo->exec("INSERT INTO goals (id,slug) VALUES (1,'emotional_connection')");
+$pdo->exec("INSERT INTO goals (id,slug) VALUES (1,'emotional_connection'),(2,'friendly_conversation')");
 $pdo->exec("INSERT INTO profiles (user_id,birth_year,country_code,region_code,location_cell_l4,location_cell_l5,communication_style,social_energy) VALUES (1,1992,'IR','THR','THR','THR5',3,3),(2,1990,'IR','THR','THR','THR5',3,3)");
-$pdo->exec("INSERT INTO match_candidate_queue (user_id,candidate_user_id,goal_id,hard_filter_passed,compatibility_score,score_breakdown_json,status,expires_at,processed_at) VALUES (1,2,1,1,91,'{\"score_breakdown\":{\"schedule_overlap\":80},\"top_match_reasons\":[\"explanation.value_1\"]}','scored',datetime('now','+1 day'),datetime('now'))");
+$pdo->exec("INSERT INTO match_candidate_queue (user_id,candidate_user_id,goal_id,hard_filter_passed,compatibility_score,score_breakdown_json,status,expires_at,processed_at) VALUES
+    (1,2,1,1,91,'{\"score_breakdown\":{\"schedule_overlap\":80},\"top_match_reasons\":[\"explanation.value_1\"]}','scored',datetime('now','+1 day'),datetime('now')),
+    (1,2,2,1,88,'{\"score_breakdown\":{\"schedule_overlap\":70},\"top_match_reasons\":[\"explanation.value_2\"]}','scored',datetime('now','+1 day'),datetime('now'))");
 
 $notifications = new NotificationService(new NotificationRepository($pdo));
 $builder = new MatchCardBuilderService(new MatchCardRepository($pdo), new AgeLabelBuilderService(), new DistanceBucketService(), new EmotionalSummaryBuilderService(), 1, $notifications);
 $built = $builder->buildOrRefreshForUser(1, 10);
-vassert($built === 1, 'strong match card should build');
+vassert($built === 2, 'two goal-based cards should build');
 $strongCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications n JOIN notification_templates t ON t.id=n.template_id WHERE t.template_key='notification.strong_match_available'")->fetchColumn();
-vassert($strongCount === 1, 'strong_match_available should be emitted');
+vassert($strongCount === 2, 'strong_match_available should be emitted once per entity match');
+$builder->buildOrRefreshForUser(1, 10);
+$strongCountAfterSecondRun = (int)$pdo->query("SELECT COUNT(*) FROM notifications n JOIN notification_templates t ON t.id=n.template_id WHERE t.template_key='notification.strong_match_available'")->fetchColumn();
+vassert($strongCountAfterSecondRun === 2, 'running card builder again should not duplicate strong_match notifications');
 
-$matchId = (int)$pdo->query('SELECT id FROM matches LIMIT 1')->fetchColumn();
+$cardsForViewer = (new MatchDeliveryService(new MatchCardRepository($pdo)))->cardsForViewer(1, 20, 0);
+vassert(count($cardsForViewer) === 1, 'dashboard delivery should keep one best card per counterpart');
+vassert((int)$cardsForViewer[0]['counterpart_user_id'] === 2, 'self-match should never be returned in delivery');
+
+$matchId = (int)$pdo->query('SELECT id FROM matches ORDER BY id ASC LIMIT 1')->fetchColumn();
 $interestService = new MatchInterestService(new MatchInterestRepository($pdo), $notifications, $pdo);
 $interestService->applyAction($matchId, 1, 'interested');
 $res = $interestService->applyAction($matchId, 2, 'interested');

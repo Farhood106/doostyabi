@@ -36,6 +36,11 @@ $csrf = app()->make(App\Security\Csrf::class);
                     <strong><?= htmlspecialchars(t((string)$notification['title_text_key']), ENT_QUOTES, 'UTF-8') ?></strong>
                     <div><?= htmlspecialchars(t((string)$notification['body_text_key']), ENT_QUOTES, 'UTF-8') ?></div>
                     <small><?= htmlspecialchars((string)$notification['created_at'], ENT_QUOTES, 'UTF-8') ?></small>
+                    <?php if (!empty($notification['action_url']) && !empty($notification['action_label_key'])): ?>
+                        <a class="btn" href="<?= htmlspecialchars((string)$notification['action_url'], ENT_QUOTES, 'UTF-8') ?>" style="display:inline-block;text-decoration:none;margin-inline-start:8px;">
+                            <?= htmlspecialchars(t((string)$notification['action_label_key']), ENT_QUOTES, 'UTF-8') ?>
+                        </a>
+                    <?php endif; ?>
                     <?php if ((int)$notification['is_read'] === 0): ?>
                         <form method="post" action="/notifications/read" style="display:inline-block;margin-inline-start:8px;">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">

@@ -116,6 +116,8 @@ JOIN no_match_states n2
   - `reveal_request_expired`: emitted when pending request expires during panel load/check.
   - `new_message_received` (lightweight scaffold): emitted to the counterpart on message send.
 - Dashboard loads recent notifications + unread count and allows mark-read / mark-all-read.
+- Notification dedupe scope (MVP): `(user_id, template_id, entity_type, entity_id)` for entity-bound events.
+- Strong-match emission rule: only on new card above threshold or threshold-crossing from below to above (not on every refresh).
 
 ## Goal-aware starter prompt strategy (phase 1)
 
@@ -126,3 +128,41 @@ JOIN no_match_states n2
   - no extracted private profile facts,
   - no pressure features (seen/typing/online).
 - On chat open, system inserts up to 2 prompt messages once (duplicate-safe via existing prompt-message check).
+
+## Counterpart dedupe in dashboard cards (MVP)
+
+- Delivery query suppresses near-identical duplicates and returns only the best card per counterpart user for each viewer.
+- Self-match rows are explicitly excluded.
+- If multiple goal-specific matches exist for the same counterpart, highest score/newest card wins for dashboard display.
+
+### Optional cleanup SQL (existing duplicate notifications/cards)
+
+```sql
+-- Keep newest notification per dedupe scope for strong match notifications.
+DELETE n1
+FROM notifications n1
+JOIN notifications n2
+  ON n1.user_id = n2.user_id
+ AND n1.template_id = n2.template_id
+ AND IFNULL(n1.entity_type, '') = IFNULL(n2.entity_type, '')
+ AND IFNULL(n1.entity_id, 0) = IFNULL(n2.entity_id, 0)
+ AND n1.id < n2.id
+JOIN notification_templates t
+  ON t.id = n1.template_id
+WHERE t.template_key = 'notification.strong_match_available';
+
+-- Keep best card per viewer/counterpart pair (by score, updated_at, id).
+DELETE mc_old
+FROM match_cards mc_old
+JOIN matches m_old ON m_old.id = mc_old.match_id
+JOIN match_cards mc_new
+  ON mc_new.viewer_user_id = mc_old.viewer_user_id
+JOIN matches m_new ON m_new.id = mc_new.match_id
+WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id ELSE m_old.user_a_id END) =
+      (CASE WHEN m_new.user_a_id = mc_new.viewer_user_id THEN m_new.user_b_id ELSE m_new.user_a_id END)
+  AND (
+       mc_new.compatibility_score > mc_old.compatibility_score
+       OR (mc_new.compatibility_score = mc_old.compatibility_score AND mc_new.updated_at > mc_old.updated_at)
+       OR (mc_new.compatibility_score = mc_old.compatibility_score AND mc_new.updated_at = mc_old.updated_at AND mc_new.id > mc_old.id)
+  );
+```

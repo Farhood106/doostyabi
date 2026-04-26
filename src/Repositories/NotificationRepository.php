@@ -21,6 +21,13 @@ final class NotificationRepository
 
     public function create(int $userId, int $templateId, ?int $actorUserId, ?string $entityType, ?int $entityId, array $payload = []): int
     {
+        if ($entityType !== null && $entityId !== null) {
+            $existingId = $this->existingIdByScope($userId, $templateId, $entityType, $entityId);
+            if ($existingId !== null) {
+                return $existingId;
+            }
+        }
+
         $stmt = $this->pdo->prepare(
             'INSERT INTO notifications (user_id, template_id, actor_user_id, entity_type, entity_id, payload_json, is_read, delivered_at, created_at)
              VALUES (:user_id, :template_id, :actor_user_id, :entity_type, :entity_id, :payload_json, 0, :delivered_at, :created_at)'
@@ -83,5 +90,28 @@ final class NotificationRepository
     {
         $stmt = $this->pdo->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = :uid AND is_read = 0');
         $stmt->execute(['uid' => $userId]);
+    }
+
+    private function existingIdByScope(int $userId, int $templateId, string $entityType, int $entityId): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id
+             FROM notifications
+             WHERE user_id = :user_id
+               AND template_id = :template_id
+               AND entity_type = :entity_type
+               AND entity_id = :entity_id
+             ORDER BY id DESC
+             LIMIT 1'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'template_id' => $templateId,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+        ]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int)$id;
     }
 }

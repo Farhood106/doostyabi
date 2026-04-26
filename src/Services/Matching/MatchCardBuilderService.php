@@ -9,6 +9,7 @@ use App\Services\NotificationService;
 
 final class MatchCardBuilderService
 {
+    private const STRONG_MATCH_THRESHOLD = 82.0;
     private const SAFE_BOUNDARY_KEY_ALLOWLIST = [
         'communication_tone',
         'response_window',
@@ -76,9 +77,13 @@ final class MatchCardBuilderService
                 ]
             );
 
-            $this->repo->upsertViewerCard($matchId, $viewerUserId, $payload);
+            $cardUpsert = $this->repo->upsertViewerCard($matchId, $viewerUserId, $payload);
             $this->repo->markQueuePresented((int)$row['id']);
-            if ($this->notifications !== null && (float)$payload['compatibility_score'] >= 82.0) {
+            $scoreNow = (float)$payload['compatibility_score'];
+            $wasCreated = (bool)($cardUpsert['was_created'] ?? false);
+            $scoreBefore = isset($cardUpsert['previous_score']) ? (float)$cardUpsert['previous_score'] : null;
+            $crossedThreshold = $scoreBefore !== null && $scoreBefore < self::STRONG_MATCH_THRESHOLD && $scoreNow >= self::STRONG_MATCH_THRESHOLD;
+            if ($this->notifications !== null && (($wasCreated && $scoreNow >= self::STRONG_MATCH_THRESHOLD) || $crossedThreshold)) {
                 $this->notifications->emit(
                     'strong_match_available',
                     $viewerUserId,
@@ -86,8 +91,9 @@ final class MatchCardBuilderService
                     'match',
                     $matchId,
                     [
-                        'compatibility_score' => (float)$payload['compatibility_score'],
+                        'compatibility_score' => $scoreNow,
                         'goal_id' => (int)$row['goal_id'],
+                        'match_id' => $matchId,
                     ]
                 );
             }
