@@ -23,6 +23,7 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, status TEXT NOT NULL)');
+$pdo->exec('CREATE TABLE goals (id INTEGER PRIMARY KEY, slug TEXT, title_key TEXT)');
 $pdo->exec('CREATE TABLE profiles (
     user_id INTEGER PRIMARY KEY,
     birth_year INTEGER,
@@ -93,6 +94,7 @@ $pdo->exec('CREATE TABLE match_cards (
 )');
 
 $pdo->exec("INSERT INTO users (id, status) VALUES (1,'active'), (2,'active'), (3,'active')");
+$pdo->exec("INSERT INTO goals (id, slug, title_key) VALUES (1,'friendly_conversation','goals.friendly_conversation.title')");
 $pdo->exec("INSERT INTO profiles (user_id, birth_year, country_code, region_code, location_cell_l4, location_cell_l5, communication_style, social_energy, boundary_sensitivity) VALUES
 (1, 1993, 'US', 'CA', 'L4-1', 'L5-1', 3, 3, 4),
 (2, 1996, 'US', 'CA', 'L4-1', 'L5-2', 3, 3, 4),

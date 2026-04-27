@@ -21,6 +21,7 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, status TEXT NOT NULL)');
+$pdo->exec('CREATE TABLE goals (id INTEGER PRIMARY KEY, slug TEXT, title_key TEXT)');
 $pdo->exec('CREATE TABLE matches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_a_id INTEGER NOT NULL,
@@ -74,6 +75,7 @@ $pdo->exec('CREATE TABLE match_cards (
 )');
 
 $pdo->exec("INSERT INTO users (id, status) VALUES (1,'active'),(2,'active')");
+$pdo->exec("INSERT INTO goals (id, slug, title_key) VALUES (1,'friendly_conversation','goals.friendly_conversation.title')");
 $pdo->exec("INSERT INTO matches (id, user_a_id, user_b_id, goal_id, score_a_to_b, score_b_to_a, mutual_score, explanation_json, status, created_at, updated_at)
             VALUES (10,1,2,1,80,78,79,'{}','suggested',datetime('now'),datetime('now'))");
 $pdo->exec("INSERT INTO match_cards (match_id, viewer_user_id, age_range_label_key, approx_distance_bucket, compatibility_score, emotional_summary_key, match_reasons_json, communication_boundaries_json, schedule_overlap_key, card_version, created_at, updated_at)
@@ -88,6 +90,8 @@ $service = new MatchInterestService($interestRepo);
 $service->applyAction(10, 1, 'interested');
 $actionCountInterested = (int)$pdo->query("SELECT COUNT(*) FROM match_interest_actions WHERE match_id = 10 AND actor_user_id = 1 AND action = 'interested'")->fetchColumn();
 assertMutual($actionCountInterested === 1, 'interested action should be stored');
+$statusAfterOneSide = (string)$pdo->query("SELECT status FROM matches WHERE id = 10")->fetchColumn();
+assertMutual($statusAfterOneSide === 'interested_one_side', 'one-sided interested should set interested_one_side status');
 
 // pass action stored
 $service->applyAction(10, 1, 'pass');
@@ -98,6 +102,8 @@ assertMutual($actionCountPass === 1, 'pass action should be stored');
 $delivery = new MatchDeliveryService(new MatchCardRepository($pdo));
 $cardsAfterPass = $delivery->cardsForViewer(1, 20, 0);
 assertMutual(count($cardsAfterPass) === 0, 'passed card should be excluded from active delivery');
+$passedCards = (new MatchCardRepository($pdo))->fetchPassedCards(1, 20);
+assertMutual(count($passedCards) === 1, 'passed card should remain recoverable in passed section');
 
 // undo action stored and state reset to none
 $service->applyAction(10, 1, 'undo');
@@ -105,6 +111,12 @@ $actionCountUndo = (int)$pdo->query("SELECT COUNT(*) FROM match_interest_actions
 assertMutual($actionCountUndo === 1, 'undo action should be stored');
 $stateAfterUndo = (string)$pdo->query("SELECT current_interest FROM match_interest_states WHERE match_id = 10 AND user_id = 1")->fetchColumn();
 assertMutual($stateAfterUndo === 'none', 'undo should reset interest state to none');
+
+// interested after pass must recover state
+$service->applyAction(10, 1, 'pass');
+$service->applyAction(10, 1, 'interested');
+$stateAfterReinterest = (string)$pdo->query("SELECT current_interest FROM match_interest_states WHERE match_id = 10 AND user_id = 1")->fetchColumn();
+assertMutual($stateAfterReinterest === 'interested', 'interested after pass should restore interested state');
 
 // mutual detection + chat creation
 $service->applyAction(10, 1, 'interested');

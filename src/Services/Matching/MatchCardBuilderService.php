@@ -88,12 +88,13 @@ final class MatchCardBuilderService
                     'strong_match_available',
                     $viewerUserId,
                     (int)$row['candidate_user_id'],
-                    'match',
-                    $matchId,
+                    'counterpart',
+                    (int)$row['candidate_user_id'],
                     [
                         'compatibility_score' => $scoreNow,
                         'goal_id' => (int)$row['goal_id'],
                         'match_id' => $matchId,
+                        'counterpart_user_id' => (int)$row['candidate_user_id'],
                     ]
                 );
             }

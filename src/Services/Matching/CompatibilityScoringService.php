@@ -48,6 +48,8 @@ final class CompatibilityScoringService
         if ($dimensions >= 75) $reasons[] = 'explanation.similar_core_dimensions';
         if ($schedule >= 60) $reasons[] = 'explanation.schedule_overlap_good';
         if ($goalAlignment >= 50) $reasons[] = 'explanation.shared_goal_intention';
+        if ($distance >= 70) $reasons[] = 'explanation.location_proximity_good';
+        if ($mutualPref >= 80) $reasons[] = 'explanation.mutual_preference_fit_good';
 
         $cautions = [];
         if ($lifestyle < 45) $cautions[] = 'explanation.caution_lifestyle_gap';

@@ -77,6 +77,9 @@ final class MatchInterestService
                 // Keep match in suggested but pass state hides cards from the passer in delivery.
                 $this->repo->updateMatchStatus($matchId, 'suggested');
                 $result['match_status'] = 'suggested';
+            } elseif (($aState === 'interested' && $bState === 'none') || ($bState === 'interested' && $aState === 'none')) {
+                $this->repo->updateMatchStatus($matchId, 'interested_one_side');
+                $result['match_status'] = 'interested_one_side';
             } elseif ($aState === 'none' || $bState === 'none') {
                 $this->repo->updateMatchStatus($matchId, 'suggested');
                 $result['match_status'] = 'suggested';

@@ -13,13 +13,13 @@ final class EmotionalSummaryBuilderService
         $dimensions = (float)($scoreBreakdown['dimensions'] ?? 0);
 
         if ($schedule >= 55 && $distance >= 70) {
-            return 'travel_compatible_and_flexible';
+            return 'time_and_location_aligned';
         }
 
         if ($dimensions >= 70 && (($viewer['boundary_sensitivity'] ?? 3) >= 3) && (($candidate['boundary_sensitivity'] ?? 3) >= 3)) {
             return 'calm_and_respectful_connection';
         }
 
-        return 'socially_balanced_and_low_pressure';
+        return 'balanced_and_low_pressure_connection';
     }
 }

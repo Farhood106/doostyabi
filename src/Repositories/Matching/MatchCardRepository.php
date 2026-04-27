@@ -51,7 +51,7 @@ final class MatchCardRepository
     {
         $stmt = $this->pdo->prepare(
             "SELECT p.user_id, p.birth_year, p.country_code, p.region_code, p.location_cell_l4, p.location_cell_l5,
-                    p.communication_style, p.social_energy
+                    p.communication_style, p.social_energy, p.boundary_sensitivity
              FROM profiles p
              JOIN users u ON u.id = p.user_id
              WHERE p.user_id = :uid AND u.status = 'active'
@@ -225,12 +225,16 @@ final class MatchCardRepository
                     mc.age_range_label_key, mc.approx_distance_bucket, mc.compatibility_score,
                     mc.emotional_summary_key, mc.match_reasons_json, mc.communication_boundaries_json,
                     mc.schedule_overlap_key, mc.card_version, mc.updated_at,
+                    m.goal_id, m.explanation_json,
                     m.status AS match_status,
+                    g.slug AS primary_goal_slug,
+                    g.title_key AS primary_goal_title_key,
                     c.id AS chat_id,
                     CASE WHEN m.user_a_id = mc.viewer_user_id THEN m.user_b_id ELSE m.user_a_id END AS counterpart_user_id,
                     COALESCE(mis.current_interest, 'none') AS viewer_interest
              FROM match_cards mc
              JOIN matches m ON m.id = mc.match_id
+             LEFT JOIN goals g ON g.id = m.goal_id
              LEFT JOIN chats c ON c.match_id = mc.match_id
              LEFT JOIN match_interest_states mis
                     ON mis.match_id = mc.match_id
@@ -249,12 +253,67 @@ final class MatchCardRepository
         $stmt->execute();
 
         $rows = $stmt->fetchAll();
-        foreach ($rows as &$row) {
+        $deduped = [];
+        $seenCounterparts = [];
+        foreach ($rows as $row) {
+            $counterpartUserId = (int)($row['counterpart_user_id'] ?? 0);
+            if ($counterpartUserId <= 0) {
+                continue;
+            }
+            if (isset($seenCounterparts[$counterpartUserId])) {
+                continue;
+            }
+            $seenCounterparts[$counterpartUserId] = true;
             $row['match_reasons_json'] = json_decode((string)$row['match_reasons_json'], true) ?? [];
             $row['communication_boundaries_json'] = json_decode((string)($row['communication_boundaries_json'] ?? '[]'), true) ?? [];
+            $row['explanation_json'] = json_decode((string)($row['explanation_json'] ?? '{}'), true) ?? [];
+            $sharedGoals = $this->sharedGoalsForPair($viewerUserId, $counterpartUserId);
+            $row['shared_goal_title_keys'] = array_column($sharedGoals, 'title_key');
+            $row['shared_goal_slugs'] = array_column($sharedGoals, 'slug');
+            $deduped[] = $row;
         }
 
-        return $rows;
+        return $deduped;
+    }
+
+    public function fetchPassedCards(int $viewerUserId, int $limit = 20): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT mc.id, mc.match_id, mc.viewer_user_id,
+                    mc.compatibility_score,
+                    m.status AS match_status,
+                    CASE WHEN m.user_a_id = mc.viewer_user_id THEN m.user_b_id ELSE m.user_a_id END AS counterpart_user_id,
+                    COALESCE(mis.current_interest, 'none') AS viewer_interest
+             FROM match_cards mc
+             JOIN matches m ON m.id = mc.match_id
+             LEFT JOIN match_interest_states mis
+                    ON mis.match_id = mc.match_id
+                   AND mis.user_id = mc.viewer_user_id
+             WHERE mc.viewer_user_id = :uid
+               AND (m.user_a_id = mc.viewer_user_id OR m.user_b_id = mc.viewer_user_id)
+               AND m.user_a_id <> m.user_b_id
+               AND m.status IN ('suggested', 'interested_one_side', 'mutual', 'chat_open')
+               AND COALESCE(mis.current_interest, 'none') = 'passed'
+             ORDER BY mc.updated_at DESC, mc.id DESC
+             LIMIT :limit"
+        );
+        $stmt->bindValue(':uid', $viewerUserId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll();
+        $deduped = [];
+        $seenCounterparts = [];
+        foreach ($rows as $row) {
+            $counterpartUserId = (int)($row['counterpart_user_id'] ?? 0);
+            if ($counterpartUserId <= 0 || isset($seenCounterparts[$counterpartUserId])) {
+                continue;
+            }
+            $seenCounterparts[$counterpartUserId] = true;
+            $deduped[] = $row;
+        }
+
+        return $deduped;
     }
 
     private function isSqlite(): bool
@@ -269,5 +328,24 @@ final class MatchCardRepository
         $row = $stmt->fetch();
 
         return $row ?: null;
+    }
+
+    private function sharedGoalsForPair(int $viewerUserId, int $counterpartUserId): array
+    {
+        $a = min($viewerUserId, $counterpartUserId);
+        $b = max($viewerUserId, $counterpartUserId);
+
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT g.slug, g.title_key
+             FROM matches m
+             JOIN goals g ON g.id = m.goal_id
+             WHERE m.user_a_id = :a
+               AND m.user_b_id = :b
+               AND m.status IN ('suggested', 'interested_one_side', 'mutual', 'chat_open')
+             ORDER BY g.id ASC"
+        );
+        $stmt->execute(['a' => $a, 'b' => $b]);
+
+        return $stmt->fetchAll();
     }
 }

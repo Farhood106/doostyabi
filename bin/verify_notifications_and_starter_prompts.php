@@ -33,8 +33,8 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
 
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, status TEXT NOT NULL)');
-$pdo->exec('CREATE TABLE goals (id INTEGER PRIMARY KEY, slug TEXT NOT NULL)');
-$pdo->exec('CREATE TABLE profiles (user_id INTEGER PRIMARY KEY, birth_year INTEGER, country_code TEXT, region_code TEXT, location_cell_l4 TEXT, location_cell_l5 TEXT, communication_style INTEGER, social_energy INTEGER)');
+$pdo->exec('CREATE TABLE goals (id INTEGER PRIMARY KEY, slug TEXT NOT NULL, title_key TEXT)');
+$pdo->exec('CREATE TABLE profiles (user_id INTEGER PRIMARY KEY, birth_year INTEGER, country_code TEXT, region_code TEXT, location_cell_l4 TEXT, location_cell_l5 TEXT, communication_style INTEGER, social_energy INTEGER, boundary_sensitivity INTEGER)');
 $pdo->exec('CREATE TABLE profile_boundaries (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, boundary_key TEXT, boundary_value TEXT, importance TEXT)');
 $pdo->exec('CREATE TABLE matches (id INTEGER PRIMARY KEY AUTOINCREMENT, user_a_id INTEGER, user_b_id INTEGER, goal_id INTEGER, score_a_to_b REAL, score_b_to_a REAL, mutual_score REAL, explanation_json TEXT, status TEXT, created_at TEXT, updated_at TEXT, chat_opened_at TEXT, closed_at TEXT, closed_reason_code TEXT)');
 $pdo->exec('CREATE TABLE chats (id INTEGER PRIMARY KEY AUTOINCREMENT, match_id INTEGER, status TEXT, opened_at TEXT)');
@@ -65,8 +65,8 @@ foreach ($templates as [$key, $cat]) {
 }
 
 $pdo->exec("INSERT INTO users (id,status) VALUES (1,'active'),(2,'active'),(3,'active')");
-$pdo->exec("INSERT INTO goals (id,slug) VALUES (1,'emotional_connection'),(2,'friendly_conversation')");
-$pdo->exec("INSERT INTO profiles (user_id,birth_year,country_code,region_code,location_cell_l4,location_cell_l5,communication_style,social_energy) VALUES (1,1992,'IR','THR','THR','THR5',3,3),(2,1990,'IR','THR','THR','THR5',3,3)");
+$pdo->exec("INSERT INTO goals (id,slug,title_key) VALUES (1,'emotional_connection','goals.emotional_connection.title'),(2,'friendly_conversation','goals.friendly_conversation.title')");
+$pdo->exec("INSERT INTO profiles (user_id,birth_year,country_code,region_code,location_cell_l4,location_cell_l5,communication_style,social_energy,boundary_sensitivity) VALUES (1,1992,'IR','THR','THR','THR5',3,3,4),(2,1990,'IR','THR','THR','THR5',3,3,4)");
 $pdo->exec("INSERT INTO match_candidate_queue (user_id,candidate_user_id,goal_id,hard_filter_passed,compatibility_score,score_breakdown_json,status,expires_at,processed_at) VALUES
     (1,2,1,1,91,'{\"score_breakdown\":{\"schedule_overlap\":80},\"top_match_reasons\":[\"explanation.value_1\"]}','scored',datetime('now','+1 day'),datetime('now')),
     (1,2,2,1,88,'{\"score_breakdown\":{\"schedule_overlap\":70},\"top_match_reasons\":[\"explanation.value_2\"]}','scored',datetime('now','+1 day'),datetime('now'))");
@@ -76,10 +76,12 @@ $builder = new MatchCardBuilderService(new MatchCardRepository($pdo), new AgeLab
 $built = $builder->buildOrRefreshForUser(1, 10);
 vassert($built === 2, 'two goal-based cards should build');
 $strongCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications n JOIN notification_templates t ON t.id=n.template_id WHERE t.template_key='notification.strong_match_available'")->fetchColumn();
-vassert($strongCount === 2, 'strong_match_available should be emitted once per entity match');
+vassert($strongCount === 1, 'strong_match_available should be deduped to one per viewer/counterpart');
+$strongEntityOk = (int)$pdo->query("SELECT COUNT(*) FROM notifications n JOIN notification_templates t ON t.id=n.template_id WHERE t.template_key='notification.strong_match_available' AND n.entity_type='counterpart' AND n.entity_id=2")->fetchColumn();
+vassert($strongEntityOk === 1, 'strong_match should use counterpart entity scope');
 $builder->buildOrRefreshForUser(1, 10);
 $strongCountAfterSecondRun = (int)$pdo->query("SELECT COUNT(*) FROM notifications n JOIN notification_templates t ON t.id=n.template_id WHERE t.template_key='notification.strong_match_available'")->fetchColumn();
-vassert($strongCountAfterSecondRun === 2, 'running card builder again should not duplicate strong_match notifications');
+vassert($strongCountAfterSecondRun === 1, 'running card builder again should not duplicate strong_match notifications');
 
 $cardsForViewer = (new MatchDeliveryService(new MatchCardRepository($pdo)))->cardsForViewer(1, 20, 0);
 vassert(count($cardsForViewer) === 1, 'dashboard delivery should keep one best card per counterpart');
