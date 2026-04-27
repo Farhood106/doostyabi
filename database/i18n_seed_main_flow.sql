@@ -603,7 +603,7 @@ INSERT INTO i18n_texts (namespace, text_key, locale_code, text_value) VALUES
 ('notification','notifications.new_message_received.title','fa','پیام جدید در گفتگوی امن'),
 ('notification','notifications.new_message_received.title','en','New message in secure chat'),
 ('notification','notifications.new_message_received.body','fa','پیام جدیدی دریافت کردید.'),
-('notification','notifications.new_message_received.body','en','You received a new message.')
+('notification','notifications.new_message_received.body','en','You received a new message.'),
 
 
 ('onboarding','onboarding.goal_main_question','fa','برای چه نوع آشنایی اینجا هستید؟'),
