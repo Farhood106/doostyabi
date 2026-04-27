@@ -67,11 +67,13 @@ final class ChatService
     public function starterPromptKeysForChat(int $chatId): array
     {
         $goalSlug = $this->repo->matchGoalSlugByChatId($chatId);
+        $matchId = $this->repo->chatMatchId($chatId);
         if ($this->starterPrompts === null) {
             return ['chat.starter_prompt.1', 'chat.starter_prompt.2', 'chat.starter_prompt.3'];
         }
 
-        return $this->starterPrompts->promptKeysForGoalSlug($goalSlug);
+        $hints = $matchId !== null ? $this->repo->goalPreferenceHintsByMatchId($matchId) : [];
+        return $this->starterPrompts->promptKeysForGoalSlugAndPreferences($goalSlug, $hints);
     }
 
     public function ensureGoalStarterPromptMessages(int $chatId, int $senderUserId, ?int $matchId = null): void
@@ -87,7 +89,8 @@ final class ChatService
         $goalSlug = $matchId !== null && $matchId > 0
             ? $this->repo->chatGoalSlugByMatchId($matchId)
             : $this->repo->matchGoalSlugByChatId($chatId);
-        $keys = $this->starterPrompts->promptKeysForGoalSlug($goalSlug);
+        $hints = $matchId !== null && $matchId > 0 ? $this->repo->goalPreferenceHintsByMatchId($matchId) : [];
+        $keys = $this->starterPrompts->promptKeysForGoalSlugAndPreferences($goalSlug, $hints);
 
         foreach (array_slice($keys, 0, 2) as $key) {
             $body = function_exists('t') ? (string)\t($key) : (string)$key;

@@ -19,6 +19,7 @@ final class OnboardingProgressService
             'boundaries' => $state['profile'],
             'availability' => $state['profile'] && $state['boundaries'],
             'goals' => $state['profile'] && $state['boundaries'] && $state['availability'],
+            'goal-questions' => $state['profile'] && $state['boundaries'] && $state['availability'] && $state['goals'],
             default => false,
         };
     }
@@ -31,6 +32,7 @@ final class OnboardingProgressService
         if (!$state['boundaries']) return 'boundaries';
         if (!$state['availability']) return 'availability';
         if (!$state['goals']) return 'goals';
+        if (!($state['goal_questions'] ?? false)) return 'goal-questions';
 
         return 'done';
     }

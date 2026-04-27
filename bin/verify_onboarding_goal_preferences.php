@@ -46,6 +46,8 @@ oassert(in_array('no_personal_details_early', $values, true) && in_array('no_rec
 
 // Goal preferences save/readback.
 $repo->replaceGoals(7, [1, 2]);
+$stateBeforePrefs = $repo->completionState(7);
+oassert(($stateBeforePrefs['goal_questions'] ?? true) === false, 'goal-questions step should be incomplete before saving required answers');
 $repo->replaceGoalPreferenceValues(7, [
     1 => ['travel_style' => 'economy'],
     2 => ['relationship_pace' => 'balanced'],
@@ -53,6 +55,8 @@ $repo->replaceGoalPreferenceValues(7, [
 $prefs = $repo->getGoalPreferenceValuesForUser(7);
 oassert(($prefs[1]['travel_style'] ?? '') === 'economy', 'goal preference 1 should persist');
 oassert(($prefs[2]['relationship_pace'] ?? '') === 'balanced', 'goal preference 2 should persist');
+$stateAfterPrefs = $repo->completionState(7);
+oassert(($stateAfterPrefs['goal_questions'] ?? false) === true, 'goal-questions step should be complete after required answers');
 
 // Updating should replace old rows, not duplicate crash.
 $repo->replaceGoalPreferenceValues(7, [

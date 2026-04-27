@@ -142,8 +142,9 @@ final class OnboardingRepository
         $stmt = $this->pdo->prepare("SELECT COUNT(*) c FROM user_goals WHERE user_id = :uid AND status='active'");
         $stmt->execute(['uid' => $userId]);
         $goals = (int)$stmt->fetch()['c'] > 0;
+        $goal_questions = $this->goalQuestionsCompleted($userId);
 
-        return compact('profile', 'boundaries', 'availability', 'goals');
+        return compact('profile', 'boundaries', 'availability', 'goals', 'goal_questions');
     }
 
     private function hasRows(string $table, int $userId): bool
@@ -283,6 +284,33 @@ final class OnboardingRepository
         }
 
         return $result;
+    }
+
+    public function goalQuestionsCompleted(int $userId): bool
+    {
+        $goalIds = $this->getActiveGoalIdsForUser($userId);
+        if ($goalIds === []) {
+            return false;
+        }
+
+        $primaryGoalId = (int)$goalIds[0];
+        $defs = $this->goalPreferenceDefinitions([$primaryGoalId]);
+        $requiredDefs = array_values(array_filter($defs, static fn(array $d): bool => (int)($d['is_required'] ?? 0) === 1));
+        if ($requiredDefs === []) {
+            return true;
+        }
+
+        $saved = $this->getGoalPreferenceValuesForUser($userId);
+        foreach ($requiredDefs as $def) {
+            $goalId = (int)$def['goal_id'];
+            $prefKey = (string)$def['pref_key'];
+            $value = trim((string)($saved[$goalId][$prefKey] ?? ''));
+            if ($value === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isSqlite(): bool

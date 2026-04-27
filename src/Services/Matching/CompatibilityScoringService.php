@@ -14,7 +14,8 @@ final class CompatibilityScoringService
             'lifestyle' => 10,
             'distance_fit' => 10,
             'schedule_overlap' => 15,
-            'mutual_preference_fit' => 10,
+            'mutual_preference_fit' => 5,
+            'goal_specific_fit' => 5,
         ];
 
         $goalAlignment = min(100.0, count($goalOverlap) * 50.0);
@@ -23,6 +24,7 @@ final class CompatibilityScoringService
         $distance = $this->distanceFit($source, $candidate);
         $schedule = $this->scheduleOverlapSymmetric($source['availability'], $candidate['availability']);
         $mutualPref = $this->mutualPreferenceFit($source, $candidate);
+        $goalSpecific = $this->goalSpecificFit($source, $candidate, $goalOverlap);
 
         $weighted =
             ($goalAlignment * $weights['goal_alignment']) +
@@ -30,7 +32,8 @@ final class CompatibilityScoringService
             ($lifestyle * $weights['lifestyle']) +
             ($distance * $weights['distance_fit']) +
             ($schedule * $weights['schedule_overlap']) +
-            ($mutualPref * $weights['mutual_preference_fit']);
+            ($mutualPref * $weights['mutual_preference_fit']) +
+            ($goalSpecific['score'] * $weights['goal_specific_fit']);
 
         $score = round($weighted / 100, 2);
 
@@ -41,6 +44,10 @@ final class CompatibilityScoringService
             'distance_fit' => round($distance, 2),
             'schedule_overlap' => round($schedule, 2),
             'mutual_preference_fit' => round($mutualPref, 2),
+            'goal_specific_fit' => round((float)$goalSpecific['score'], 2),
+            'shared_goal_keys' => $goalSpecific['shared_goal_keys'],
+            'preference_matches' => $goalSpecific['preference_matches'],
+            'preference_gaps' => $goalSpecific['preference_gaps'],
             'weights' => $weights,
         ];
 
@@ -50,6 +57,8 @@ final class CompatibilityScoringService
         if ($goalAlignment >= 50) $reasons[] = 'explanation.shared_goal_intention';
         if ($distance >= 70) $reasons[] = 'explanation.location_proximity_good';
         if ($mutualPref >= 80) $reasons[] = 'explanation.mutual_preference_fit_good';
+        if ((float)$goalSpecific['score'] >= 75) $reasons[] = 'explanation.goal_specific_alignment_good';
+        if ((float)$goalSpecific['score'] >= 45 && (float)$goalSpecific['score'] < 75) $reasons[] = 'explanation.goal_specific_alignment_partial';
 
         $cautions = [];
         if ($lifestyle < 45) $cautions[] = 'explanation.caution_lifestyle_gap';
@@ -196,5 +205,79 @@ final class CompatibilityScoringService
         $score += ($a['interested_in_gender'] === null || $a['interested_in_gender'] === '' || $a['interested_in_gender'] === $b['gender_identity']) ? 50 : 20;
         $score += ($b['interested_in_gender'] === null || $b['interested_in_gender'] === '' || $b['interested_in_gender'] === $a['gender_identity']) ? 50 : 20;
         return $score;
+    }
+
+    private function goalSpecificFit(array $source, array $candidate, array $goalOverlap): array
+    {
+        $src = (array)($source['goal_preferences'] ?? []);
+        $dst = (array)($candidate['goal_preferences'] ?? []);
+
+        $matches = [];
+        $gaps = [];
+        $exact = 0;
+        $partial = 0;
+        $compared = 0;
+
+        foreach ($goalOverlap as $goalIdRaw) {
+            $goalId = (int)$goalIdRaw;
+            $srcPrefs = (array)($src[$goalId] ?? []);
+            $dstPrefs = (array)($dst[$goalId] ?? []);
+            $keys = array_values(array_unique(array_merge(array_keys($srcPrefs), array_keys($dstPrefs))));
+            foreach ($keys as $key) {
+                $a = trim((string)($srcPrefs[$key] ?? ''));
+                $b = trim((string)($dstPrefs[$key] ?? ''));
+                if ($a === '' || $b === '') {
+                    $gaps[] = 'goal:' . $goalId . ':' . $key;
+                    continue;
+                }
+                $compared++;
+                if ($a === $b) {
+                    $exact++;
+                    $matches[] = 'goal:' . $goalId . ':' . $key . ':exact';
+                    continue;
+                }
+                if ($this->isNearbyPreference($a, $b)) {
+                    $partial++;
+                    $matches[] = 'goal:' . $goalId . ':' . $key . ':nearby';
+                    continue;
+                }
+                $gaps[] = 'goal:' . $goalId . ':' . $key . ':mismatch';
+            }
+        }
+
+        if ($compared === 0) {
+            return [
+                'score' => 50.0,
+                'shared_goal_keys' => array_values(array_map('intval', $goalOverlap)),
+                'preference_matches' => [],
+                'preference_gaps' => array_slice(array_values(array_unique($gaps)), 0, 6),
+            ];
+        }
+
+        $score = (($exact * 1.0) + ($partial * 0.5)) / max(1, $compared) * 100.0;
+
+        return [
+            'score' => round($score, 2),
+            'shared_goal_keys' => array_values(array_map('intval', $goalOverlap)),
+            'preference_matches' => array_slice(array_values(array_unique($matches)), 0, 8),
+            'preference_gaps' => array_slice(array_values(array_unique($gaps)), 0, 8),
+        ];
+    }
+
+    private function isNearbyPreference(string $a, string $b): bool
+    {
+        $pairs = [
+            ['slow', 'balanced'], ['balanced', 'fast'],
+            ['low', 'moderate'], ['moderate', 'high'],
+            ['soft', 'balanced'], ['balanced', 'direct'],
+            ['weekend', 'flexible'], ['planned', 'balanced'], ['balanced', 'spontaneous'],
+            ['private', 'selective'], ['selective', 'open'],
+        ];
+        foreach ($pairs as [$x, $y]) {
+            if (($a === $x && $b === $y) || ($a === $y && $b === $x)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

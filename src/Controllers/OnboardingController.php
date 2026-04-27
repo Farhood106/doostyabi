@@ -12,6 +12,7 @@ use App\Core\View;
 use App\Repositories\GoalRepository;
 use App\Repositories\OnboardingRepository;
 use App\Security\Csrf;
+use App\Services\GoalQuestionCatalogService;
 use App\Services\OnboardingProgressService;
 use App\Validation\Validator;
 use Throwable;
@@ -397,8 +398,6 @@ final class OnboardingController
         $this->validateCsrf($request, '/onboarding/goals');
         $goalIds = array_values(array_unique(array_map('intval', (array)$request->input('goal_ids', []))));
         $_SESSION['_old']['goal_ids'] = $goalIds;
-        $goalPreferences = (array)($request->input('goal_pref') ?? []);
-        $_SESSION['_old']['goal_pref'] = $goalPreferences;
 
         if (count($goalIds) === 0) {
             flash('errors', ['goal_ids' => ['validation.goal_selection_required']]);
@@ -416,21 +415,56 @@ final class OnboardingController
         try {
             $uid = $this->userId();
             $repo->replaceGoals($uid, $goalIds);
-            $definitions = $repo->goalPreferenceDefinitions($goalIds);
-            $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences);
-            if ($prefErrors !== []) {
-                flash('errors', $prefErrors);
-                Response::redirect('/onboarding/goals');
-            }
-            $repo->replaceGoalPreferenceValues($uid, $goalPreferences);
-            $repo->markProfileCompleted($uid);
         } catch (Throwable $e) {
             $this->logException($e, 'onboarding.goals');
             flash('message', 'common.unexpected_error');
             Response::redirect('/onboarding/goals');
         }
 
-        unset($_SESSION['_old']);
+        $this->clearOldInputs(['goal_ids']);
+        flash('message', 'onboarding.goals_saved');
+        Response::redirect('/onboarding/goal-questions');
+    }
+
+    public function showGoalQuestions(Request $request): void
+    {
+        $this->guardStep('goal-questions');
+        $goals = $this->app->make(GoalRepository::class)->activeGoals();
+        View::render('onboarding/goal_questions', $this->goalQuestionsViewData($goals));
+    }
+
+    public function saveGoalQuestions(Request $request): never
+    {
+        $this->guardStep('goal-questions');
+        $this->validateCsrf($request, '/onboarding/goal-questions');
+        $goalPreferences = (array)($request->input('goal_pref') ?? []);
+        $_SESSION['_old']['goal_pref'] = $goalPreferences;
+
+        $uid = $this->userId();
+        $repo = $this->app->make(OnboardingRepository::class);
+        $goalIds = $repo->getActiveGoalIdsForUser($uid);
+        if ($goalIds === []) {
+            flash('message', 'validation.goal_selection_required');
+            Response::redirect('/onboarding/goals');
+        }
+
+        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($goalIds);
+        $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences);
+        if ($prefErrors !== []) {
+            flash('errors', $prefErrors);
+            Response::redirect('/onboarding/goal-questions');
+        }
+
+        try {
+            $repo->replaceGoalPreferenceValues($uid, $goalPreferences);
+            $repo->markProfileCompleted($uid);
+        } catch (Throwable $e) {
+            $this->logException($e, 'onboarding.goal_questions');
+            flash('message', 'common.unexpected_error');
+            Response::redirect('/onboarding/goal-questions');
+        }
+
+        $this->clearOldInputs(['goal_pref']);
         flash('message', 'onboarding.completed');
         Response::redirect('/dashboard');
     }
@@ -738,13 +772,9 @@ final class OnboardingController
     private function goalsViewData(array $goals): array
     {
         $savedGoalIds = $this->app->make(OnboardingRepository::class)->getActiveGoalIdsForUser($this->userId());
-        $repo = $this->app->make(OnboardingRepository::class);
         $selectedGoalIds = $this->hasOldInput('goal_ids')
             ? array_values(array_unique(array_map('intval', (array)$this->oldInput('goal_ids', []))))
             : $savedGoalIds;
-        $savedPrefValues = $repo->getGoalPreferenceValuesForUser($this->userId());
-        $prefValues = $this->hasOldInput('goal_pref') ? (array)$this->oldInput('goal_pref', []) : $savedPrefValues;
-        $definitions = $repo->goalPreferenceDefinitions($selectedGoalIds !== [] ? $selectedGoalIds : $savedGoalIds);
 
         $groups = [];
         foreach ($goals as $goal) {
@@ -768,9 +798,62 @@ final class OnboardingController
         return $this->viewData() + [
             'goalGroups' => $ordered,
             'selectedGoalIds' => $selectedGoalIds,
+        ];
+    }
+
+    private function goalQuestionsViewData(array $goals): array
+    {
+        $repo = $this->app->make(OnboardingRepository::class);
+        $selectedGoalIds = $repo->getActiveGoalIdsForUser($this->userId());
+        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($selectedGoalIds);
+        $savedPrefValues = $repo->getGoalPreferenceValuesForUser($this->userId());
+        $prefValues = $this->hasOldInput('goal_pref') ? (array)$this->oldInput('goal_pref', []) : $savedPrefValues;
+
+        $goalTitleById = [];
+        $goalSlugById = [];
+        foreach ($goals as $goal) {
+            $goalId = (int)($goal['id'] ?? 0);
+            if ($goalId <= 0) {
+                continue;
+            }
+            $goalTitleById[$goalId] = (string)($goal['title_key'] ?? 'onboarding.goals_title');
+            $goalSlugById[$goalId] = (string)($goal['slug'] ?? '');
+        }
+
+        return $this->viewData() + [
+            'selectedGoalIds' => $selectedGoalIds,
             'goalPreferenceDefinitions' => $definitions,
             'goalPreferenceValues' => $prefValues,
+            'goalTitleById' => $goalTitleById,
+            'goalSlugById' => $goalSlugById,
         ];
+    }
+
+    private function goalQuestionDefinitionsForSelectedGoals(array $goalIds): array
+    {
+        if ($goalIds === []) {
+            return [];
+        }
+
+        $repo = $this->app->make(OnboardingRepository::class);
+        $activeGoals = $this->app->make(GoalRepository::class)->activeGoals();
+        $goalSlugById = [];
+        foreach ($activeGoals as $goal) {
+            $goalSlugById[(int)$goal['id']] = (string)($goal['slug'] ?? '');
+        }
+
+        // MVP: prioritize primary goal for question rendering while keeping
+        // persistence format multi-goal compatible.
+        $primaryGoalId = (int)$goalIds[0];
+        $primarySlug = $goalSlugById[$primaryGoalId] ?? '';
+        $allowedKeys = $this->app->make(GoalQuestionCatalogService::class)->allowedPreferenceKeysForGoalSlug($primarySlug);
+        $defs = $repo->goalPreferenceDefinitions([$primaryGoalId]);
+
+        if ($allowedKeys === []) {
+            return $defs;
+        }
+
+        return array_values(array_filter($defs, static fn(array $def): bool => in_array((string)($def['pref_key'] ?? ''), $allowedKeys, true)));
     }
 
     private function validateGoalPreferenceAnswers(array $definitions, array $input): array

@@ -20,6 +20,16 @@ $purposeFromGoalSlug = static function (?string $goalSlug): string {
         default => 'match_card.purpose.general',
     };
 };
+$starterFromGoalSlug = static function (?string $goalSlug): string {
+    return match ((string)$goalSlug) {
+        'long_term_relationship', 'emotional_connection' => 'match_card.starter.emotional',
+        'travel_companion', 'event_companion', 'social_activity_partner' => 'match_card.starter.travel_activity',
+        'sports_companion' => 'match_card.starter.sports',
+        'project_collaboration', 'co_living' => 'match_card.starter.collaboration',
+        'casual_connection' => 'match_card.starter.casual_respectful',
+        default => 'match_card.starter.general',
+    };
+};
 $csrf = app()->make(App\Security\Csrf::class);
 ?>
 <h2><?= htmlspecialchars(t('dashboard.title'), ENT_QUOTES, 'UTF-8') ?></h2>
@@ -69,6 +79,7 @@ $csrf = app()->make(App\Security\Csrf::class);
     <li><a href="/onboarding/boundaries"><?= htmlspecialchars(t('onboarding.boundaries_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
     <li><a href="/onboarding/availability"><?= htmlspecialchars(t('onboarding.availability_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
     <li><a href="/onboarding/goals"><?= htmlspecialchars(t('onboarding.goals_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
+    <li><a href="/onboarding/goal-questions"><?= htmlspecialchars(t('onboarding.goal_specific_questions_title'), ENT_QUOTES, 'UTF-8') ?></a></li>
 </ul>
 
 <h3 id="matches"><?= htmlspecialchars(t('dashboard.match_cards_title'), ENT_QUOTES, 'UTF-8') ?></h3>
@@ -109,6 +120,10 @@ $csrf = app()->make(App\Security\Csrf::class);
                 <div style="margin-top:6px;">
                     <strong><?= htmlspecialchars(t('match_card.conversation_purpose_label'), ENT_QUOTES, 'UTF-8') ?>:</strong>
                     <?= htmlspecialchars(t($purposeFromGoalSlug((string)($card['primary_goal_slug'] ?? ''))), ENT_QUOTES, 'UTF-8') ?>
+                </div>
+                <div style="margin-top:6px;">
+                    <strong><?= htmlspecialchars(t('match_card.starter_label'), ENT_QUOTES, 'UTF-8') ?>:</strong>
+                    <?= htmlspecialchars(t($starterFromGoalSlug((string)($card['primary_goal_slug'] ?? ''))), ENT_QUOTES, 'UTF-8') ?>
                 </div>
 
                 <?php if (in_array((string)($card['match_status'] ?? ''), ['mutual', 'chat_open'], true)): ?>

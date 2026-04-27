@@ -9,9 +9,17 @@ final class GoalAwareStarterPromptService
     /** @return string[] */
     public function promptKeysForGoalSlug(?string $goalSlug): array
     {
-        $cluster = $this->clusterForGoalSlug($goalSlug);
+        return $this->promptKeysForGoalSlugAndPreferences($goalSlug, []);
+    }
 
-        return match ($cluster) {
+    /**
+     * @param array<string,string> $preferenceHints
+     * @return string[]
+     */
+    public function promptKeysForGoalSlugAndPreferences(?string $goalSlug, array $preferenceHints): array
+    {
+        $cluster = $this->clusterForGoalSlug($goalSlug);
+        $base = match ($cluster) {
             'emotional' => [
                 'chat.starter.goal.emotional.1',
                 'chat.starter.goal.emotional.2',
@@ -33,6 +41,13 @@ final class GoalAwareStarterPromptService
                 'chat.starter_prompt.3',
             ],
         };
+
+        $hint = $this->hintPromptKey($preferenceHints);
+        if ($hint !== null) {
+            array_unshift($base, $hint);
+        }
+
+        return array_values(array_slice(array_unique($base), 0, 4));
     }
 
     private function clusterForGoalSlug(?string $goalSlug): string
@@ -44,5 +59,21 @@ final class GoalAwareStarterPromptService
             'project_collaboration', 'co_living' => 'collaboration',
             default => 'general',
         };
+    }
+
+    /** @param array<string,string> $preferenceHints */
+    private function hintPromptKey(array $preferenceHints): ?string
+    {
+        if (isset($preferenceHints['relationship_pace'])) {
+            return 'chat.starter.pref.relationship_pace';
+        }
+        if (isset($preferenceHints['planning_style'])) {
+            return 'chat.starter.pref.planning_style';
+        }
+        if (isset($preferenceHints['privacy_importance']) || isset($preferenceHints['privacy_comfort'])) {
+            return 'chat.starter.pref.privacy';
+        }
+
+        return null;
     }
 }

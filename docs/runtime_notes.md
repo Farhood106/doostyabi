@@ -193,4 +193,30 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
 ## Next matching phase for goal answers
 
 - Current phase stores and reads goal-specific preferences reliably.
-- Next phase should incorporate selected preference answers into compatibility scoring weights per goal cluster.
+- Goal-specific fit is now included in compatibility scoring (`goal_specific_fit`) with neutral handling for missing data.
+- Score breakdown now includes:
+  - `goal_specific_fit`
+  - `shared_goal_keys`
+  - `preference_matches`
+  - `preference_gaps`
+
+## Goal-specific question step (phase 2)
+
+- Onboarding flow is now:
+  1) profile
+  2) boundaries
+  3) availability
+  4) goals
+  5) goal-questions
+- New routes:
+  - `GET /onboarding/goal-questions`
+  - `POST /onboarding/goal-questions`
+- MVP behavior for multi-goal users:
+  - UI renders question catalog for **primary selected goal** (first active goal by priority),
+  - persistence format remains compatible with multi-goal (`goal_pref[goal_id][pref_key]`).
+
+## Goal-question catalog design
+
+- Catalog logic is centralized in `GoalQuestionCatalogService`.
+- Cluster mapping is slug-based and uses stable `pref_key` identifiers.
+- Definitions remain DB-driven through `goal_preference_definitions` (admin-ready path).

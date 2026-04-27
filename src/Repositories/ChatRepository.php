@@ -127,6 +127,15 @@ final class ChatRepository
         return $slug === false ? null : (string)$slug;
     }
 
+    public function chatMatchId(int $chatId): ?int
+    {
+        $stmt = $this->pdo->prepare("SELECT match_id FROM chats WHERE id = :chat_id LIMIT 1");
+        $stmt->execute(['chat_id' => $chatId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int)$id;
+    }
+
     public function chatGoalSlugByMatchId(int $matchId): ?string
     {
         $stmt = $this->pdo->prepare(
@@ -140,6 +149,35 @@ final class ChatRepository
         $slug = $stmt->fetchColumn();
 
         return $slug === false ? null : (string)$slug;
+    }
+
+    /** @return array<string,string> */
+    public function goalPreferenceHintsByMatchId(int $matchId): array
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT gpd.pref_key, ugp.value_string
+                 FROM matches m
+                 JOIN user_goals ug ON ug.goal_id = m.goal_id AND ug.user_id = m.user_a_id AND ug.status = 'active'
+                 JOIN user_goal_preferences ugp ON ugp.user_goal_id = ug.id
+                 JOIN goal_preference_definitions gpd ON gpd.id = ugp.preference_def_id
+                 WHERE m.id = :match_id"
+            );
+            $stmt->execute(['match_id' => $matchId]);
+            $result = [];
+            foreach ($stmt->fetchAll() as $row) {
+                $key = (string)($row['pref_key'] ?? '');
+                $value = trim((string)($row['value_string'] ?? ''));
+                if ($key === '' || $value === '') {
+                    continue;
+                }
+                $result[$key] = $value;
+            }
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function hasPromptMessages(int $chatId): bool

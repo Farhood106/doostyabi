@@ -45,6 +45,8 @@ final class CandidateRepository
         $row['goals'] = $this->activeGoalIds($userId);
         $row['boundaries'] = $this->boundaries($userId);
         $row['availability'] = $this->availability($userId);
+        $row['goal_preferences'] = $this->goalPreferences($userId);
+        $row['goal_attributes'] = $this->goalAttributes($userId);
 
         return $row;
     }
@@ -136,6 +138,52 @@ final class CandidateRepository
         $stmt = $this->pdo->prepare("SELECT weekday, start_minute, end_minute FROM availability_slots WHERE user_id = :uid");
         $stmt->execute(['uid' => $userId]);
         return $stmt->fetchAll();
+    }
+
+    public function goalPreferences(int $userId): array
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT ug.goal_id, gpd.pref_key, ugp.value_string
+                 FROM user_goal_preferences ugp
+                 JOIN user_goals ug ON ug.id = ugp.user_goal_id
+                 JOIN goal_preference_definitions gpd ON gpd.id = ugp.preference_def_id
+                 WHERE ug.user_id = :uid
+                   AND ug.status = 'active'"
+            );
+            $stmt->execute(['uid' => $userId]);
+            $result = [];
+            foreach ($stmt->fetchAll() as $row) {
+                $result[(int)$row['goal_id']][(string)$row['pref_key']] = (string)($row['value_string'] ?? '');
+            }
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    public function goalAttributes(int $userId): array
+    {
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT ug.goal_id, gad.attr_key, uga.value_string
+                 FROM user_goal_attributes uga
+                 JOIN user_goals ug ON ug.id = uga.user_goal_id
+                 JOIN goal_attribute_definitions gad ON gad.id = uga.attribute_def_id
+                 WHERE ug.user_id = :uid
+                   AND ug.status = 'active'"
+            );
+            $stmt->execute(['uid' => $userId]);
+            $result = [];
+            foreach ($stmt->fetchAll() as $row) {
+                $result[(int)$row['goal_id']][(string)$row['attr_key']] = (string)($row['value_string'] ?? '');
+            }
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function isBlocked(int $userA, int $userB): bool

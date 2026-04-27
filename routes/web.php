@@ -40,3 +40,5 @@ $router->post('/onboarding/availability', [OnboardingController::class, 'saveAva
 
 $router->get('/onboarding/goals', [OnboardingController::class, 'showGoals'], [$authMiddleware]);
 $router->post('/onboarding/goals', [OnboardingController::class, 'saveGoals'], [$authMiddleware]);
+$router->get('/onboarding/goal-questions', [OnboardingController::class, 'showGoalQuestions'], [$authMiddleware]);
+$router->post('/onboarding/goal-questions', [OnboardingController::class, 'saveGoalQuestions'], [$authMiddleware]);
