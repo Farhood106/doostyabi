@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Auth\AuthService;
 use App\Core\App;
 use App\Core\Request;
+use App\Core\Response;
 use App\Core\Router;
 
 require __DIR__ . '/autoload.php';
@@ -26,13 +27,13 @@ $router = new Router();
 
 $authMiddleware = static function (Request $request, App $app): void {
     if (!$app->make(AuthService::class)->userId()) {
-        App\Core\Response::redirect('/login');
+        Response::redirect('/login');
     }
 };
 
 $guestMiddleware = static function (Request $request, App $app): void {
     if ($app->make(AuthService::class)->userId()) {
-        App\Core\Response::redirect('/dashboard');
+        Response::redirect('/dashboard');
     }
 };
 

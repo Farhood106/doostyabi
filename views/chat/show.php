@@ -8,7 +8,21 @@ $starterPrompts = [
 ];
 $hasMessages = !empty($chat['messages'] ?? []);
 $availableRevealTypes = $revealPanel['available_request_types'] ?? [];
+$currentUserId = (int)($currentUserId ?? 0);
 ?>
+
+<style>
+  .chat-list { display:flex; flex-direction:column; gap:10px; }
+  .chat-row { display:flex; }
+  .chat-row.me { justify-content:flex-end; }
+  .chat-row.other { justify-content:flex-start; }
+  .chat-row.neutral { justify-content:center; }
+  .chat-bubble { max-width:78%; border-radius:12px; padding:8px 10px; border:1px solid #e5e7eb; background:#fff; }
+  .chat-row.me .chat-bubble { background:#ecfeff; border-color:#a5f3fc; text-align:right; }
+  .chat-row.other .chat-bubble { background:#ffffff; border-color:#e5e7eb; text-align:right; }
+  .chat-row.neutral .chat-bubble { background:#f9fafb; border-color:#e5e7eb; text-align:center; }
+  .chat-meta { color:#6b7280; font-size:12px; margin-bottom:4px; display:block; }
+</style>
 
 <h2><?= htmlspecialchars(t('chat.secure_title'), ENT_QUOTES, 'UTF-8') ?></h2>
 <p><?= htmlspecialchars(t('chat.privacy_note_long'), ENT_QUOTES, 'UTF-8') ?></p>
@@ -44,14 +58,23 @@ $availableRevealTypes = $revealPanel['available_request_types'] ?? [];
     </ul>
 </section>
 
-<div id="messages" style="border:1px solid #ddd;padding:12px;max-height:420px;overflow:auto;border-radius:8px;margin-bottom:12px;">
+<div id="messages" class="chat-list" style="border:1px solid #ddd;padding:12px;max-height:420px;overflow:auto;border-radius:8px;margin-bottom:12px;">
     <?php if (!$hasMessages): ?>
         <div data-empty-state="1" style="color:#6b7280;"><?= htmlspecialchars(t('chat.empty_messages'), ENT_QUOTES, 'UTF-8') ?></div>
     <?php else: ?>
         <?php foreach (($chat['messages'] ?? []) as $m): ?>
-            <div data-id="<?= (int)$m['id'] ?>" style="margin-bottom:10px;">
-                <small><?= htmlspecialchars((string)$m['created_at'], ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(t('chat.message_type.' . (string)$m['message_type']), ENT_QUOTES, 'UTF-8') ?></small>
-                <div><?= nl2br(htmlspecialchars((string)$m['message_body'], ENT_QUOTES, 'UTF-8')) ?></div>
+            <?php
+                $senderId = (int)($m['sender_user_id'] ?? 0);
+                $type = (string)($m['message_type'] ?? 'text');
+                $rowClass = in_array($type, ['prompt', 'system'], true)
+                    ? 'neutral'
+                    : (($senderId === $currentUserId) ? 'me' : 'other');
+            ?>
+            <div data-id="<?= (int)$m['id'] ?>" class="chat-row <?= htmlspecialchars($rowClass, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="chat-bubble">
+                    <small class="chat-meta"><?= htmlspecialchars((string)$m['created_at'], ENT_QUOTES, 'UTF-8') ?> | <?= htmlspecialchars(t('chat.message_type.' . (string)$m['message_type']), ENT_QUOTES, 'UTF-8') ?></small>
+                    <div><?= nl2br(htmlspecialchars((string)$m['message_body'], ENT_QUOTES, 'UTF-8')) ?></div>
+                </div>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
@@ -195,13 +218,22 @@ $availableRevealTypes = $revealPanel['available_request_types'] ?? [];
 
         const div = document.createElement('div');
         div.setAttribute('data-id', String(m.id));
-        div.style.marginBottom = '10px';
+        const msgType = String(m.message_type || 'text');
+        const senderId = parseInt(String(m.sender_user_id || '0'), 10) || 0;
+        const rowClass = (msgType === 'prompt' || msgType === 'system')
+          ? 'neutral'
+          : (senderId === <?= $currentUserId ?> ? 'me' : 'other');
+        div.className = 'chat-row ' + rowClass;
         const small = document.createElement('small');
+        small.className = 'chat-meta';
         small.textContent = `${m.created_at} | ${m.message_type_label || m.message_type}`;
         const body = document.createElement('div');
         body.textContent = m.message_body;
-        div.appendChild(small);
-        div.appendChild(body);
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble';
+        bubble.appendChild(small);
+        bubble.appendChild(body);
+        div.appendChild(bubble);
         box.appendChild(div);
       }
 

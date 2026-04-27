@@ -49,6 +49,7 @@ final class ChatController
                 'revealPanel' => $revealPanel,
                 'message' => flashGet('message'),
                 'starterPromptKeys' => $starterPromptKeys,
+                'currentUserId' => $userId,
             ]);
         } catch (InvalidArgumentException) {
             flash('message', 'chat.access_denied');
