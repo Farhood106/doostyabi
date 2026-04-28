@@ -6,7 +6,9 @@
 <form method="post" action="/onboarding/goals">
 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf->token(), ENT_QUOTES, 'UTF-8') ?>">
 <?php if ($e = fieldError($errors ?? [], 'goal_ids')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+<?php if ($e = fieldError($errors ?? [], 'primary_goal_id')): ?><div class="err" role="alert"><?= htmlspecialchars($e, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 <?php $selectedGoalIds = array_map('intval', (array)($selectedGoalIds ?? [])); ?>
+<?php $selectedPrimaryGoalId = (int)($selectedPrimaryGoalId ?? 0); ?>
 <?php foreach (($goalGroups ?? []) as $group): ?>
     <fieldset style="margin-top:12px;border:1px solid #ddd;padding:12px;border-radius:8px;">
         <legend><?= htmlspecialchars(t((string)$group['title_key']), ENT_QUOTES, 'UTF-8') ?></legend>
@@ -15,6 +17,12 @@
                 <input type="checkbox" name="goal_ids[]" value="<?= (int)$goal['id'] ?>" <?= in_array((int)$goal['id'], $selectedGoalIds, true) ? 'checked' : '' ?>>
                 <strong><?= htmlspecialchars(t((string)$goal['title_key']), ENT_QUOTES, 'UTF-8') ?></strong>
                 <div style="font-size:13px;color:#555;"><?= htmlspecialchars(t((string)$goal['description_key']), ENT_QUOTES, 'UTF-8') ?></div>
+                <div style="margin-top:6px;">
+                    <label style="font-size:12px;color:#444;">
+                        <input type="radio" name="primary_goal_id" value="<?= (int)$goal['id'] ?>" <?= $selectedPrimaryGoalId === (int)$goal['id'] ? 'checked' : '' ?>>
+                        <?= htmlspecialchars(t('onboarding.goal_primary_pick_label'), ENT_QUOTES, 'UTF-8') ?>
+                    </label>
+                </div>
             </label>
         <?php endforeach; ?>
     </fieldset>

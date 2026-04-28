@@ -17,8 +17,8 @@ function giAssert(bool $ok, string $msg): void
 
 $catalog = new GoalQuestionCatalogService();
 $casualKeys = $catalog->allowedPreferenceKeysForGoalSlug('casual_connection');
-giAssert(in_array('privacy_importance', $casualKeys, true), 'casual catalog should include privacy importance');
-giAssert(in_array('discretion_need', $casualKeys, true), 'casual catalog should include discretion need');
+giAssert(in_array('privacy.discretion_level', $casualKeys, true), 'casual catalog should include privacy discretion');
+giAssert(in_array('must.consent_style', $casualKeys, true), 'casual catalog should include consent style');
 
 $service = new CompatibilityScoringService();
 $baseA = [
@@ -40,7 +40,7 @@ $baseA = [
     'interested_in_gender' => '',
     'gender_identity' => 'woman',
     'goal_preferences' => [
-        10 => ['privacy_importance' => 'high', 'expectation_clarity' => 'clear', 'comfort_level' => 'balanced'],
+        10 => ['privacy.discretion_level' => 'high_preferred', 'seek.connection_expectation' => 'companionship', 'accept.emotional_involvement_level' => 'low'],
     ],
 ];
 $baseB = $baseA;
@@ -51,7 +51,7 @@ giAssert(((float)$aligned['score_breakdown']['goal_specific_fit']) >= 90.0, 'ali
 giAssert(in_array('explanation.goal_specific_alignment_good', $aligned['top_match_reasons'], true), 'aligned preferences should add goal-specific positive reason');
 
 $mismatchB = $baseB;
-$mismatchB['goal_preferences'][10] = ['privacy_importance' => 'low', 'expectation_clarity' => 'gradual', 'comfort_level' => 'open'];
+$mismatchB['goal_preferences'][10] = ['privacy.discretion_level' => 'strict_high_required', 'seek.connection_expectation' => 'light_chat', 'accept.emotional_involvement_level' => 'moderate'];
 $mismatch = $service->score($baseA, $mismatchB, [10]);
 giAssert(((float)$mismatch['score_breakdown']['goal_specific_fit']) < ((float)$aligned['score_breakdown']['goal_specific_fit']), 'mismatch should reduce goal_specific_fit');
 giAssert(count((array)$mismatch['score_breakdown']['preference_gaps']) >= 1, 'mismatch should expose preference gaps');

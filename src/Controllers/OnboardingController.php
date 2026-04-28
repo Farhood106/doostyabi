@@ -397,10 +397,17 @@ final class OnboardingController
         $this->guardStep('goals');
         $this->validateCsrf($request, '/onboarding/goals');
         $goalIds = array_values(array_unique(array_map('intval', (array)$request->input('goal_ids', []))));
+        $primaryGoalId = (int)$request->input('primary_goal_id', 0);
         $_SESSION['_old']['goal_ids'] = $goalIds;
+        $_SESSION['_old']['primary_goal_id'] = $primaryGoalId;
 
         if (count($goalIds) === 0) {
             flash('errors', ['goal_ids' => ['validation.goal_selection_required']]);
+            Response::redirect('/onboarding/goals');
+        }
+
+        if ($primaryGoalId <= 0 || !in_array($primaryGoalId, $goalIds, true)) {
+            flash('errors', ['primary_goal_id' => ['validation.primary_goal_required']]);
             Response::redirect('/onboarding/goals');
         }
 
@@ -412,16 +419,21 @@ final class OnboardingController
             Response::redirect('/onboarding/goals');
         }
 
+        if (!in_array($primaryGoalId, $activeGoalIds, true)) {
+            flash('errors', ['primary_goal_id' => ['validation.primary_goal_required']]);
+            Response::redirect('/onboarding/goals');
+        }
+
         try {
             $uid = $this->userId();
-            $repo->replaceGoals($uid, $goalIds);
+            $repo->replaceGoals($uid, $goalIds, $primaryGoalId);
         } catch (Throwable $e) {
             $this->logException($e, 'onboarding.goals');
             flash('message', 'common.unexpected_error');
             Response::redirect('/onboarding/goals');
         }
 
-        $this->clearOldInputs(['goal_ids']);
+        $this->clearOldInputs(['goal_ids', 'primary_goal_id']);
         flash('message', 'onboarding.goals_saved');
         Response::redirect('/onboarding/goal-questions');
     }
@@ -448,8 +460,13 @@ final class OnboardingController
             Response::redirect('/onboarding/goals');
         }
 
-        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($goalIds);
-        $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences);
+        $primaryGoalId = $repo->getPrimaryGoalIdForUser($uid) ?? (int)($goalIds[0] ?? 0);
+        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($goalIds, $primaryGoalId);
+        $goalSlugById = [];
+        foreach ($this->app->make(GoalRepository::class)->activeGoals() as $goal) {
+            $goalSlugById[(int)($goal['id'] ?? 0)] = (string)($goal['slug'] ?? '');
+        }
+        $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences, $goalSlugById);
         if ($prefErrors !== []) {
             flash('errors', $prefErrors);
             Response::redirect('/onboarding/goal-questions');
@@ -771,10 +788,14 @@ final class OnboardingController
 
     private function goalsViewData(array $goals): array
     {
-        $savedGoalIds = $this->app->make(OnboardingRepository::class)->getActiveGoalIdsForUser($this->userId());
+        $repo = $this->app->make(OnboardingRepository::class);
+        $savedGoalIds = $repo->getActiveGoalIdsForUser($this->userId());
         $selectedGoalIds = $this->hasOldInput('goal_ids')
             ? array_values(array_unique(array_map('intval', (array)$this->oldInput('goal_ids', []))))
             : $savedGoalIds;
+        $selectedPrimaryGoalId = $this->hasOldInput('primary_goal_id')
+            ? (int)$this->oldInput('primary_goal_id', 0)
+            : (int)($repo->getPrimaryGoalIdForUser($this->userId()) ?? 0);
 
         $groups = [];
         foreach ($goals as $goal) {
@@ -798,6 +819,7 @@ final class OnboardingController
         return $this->viewData() + [
             'goalGroups' => $ordered,
             'selectedGoalIds' => $selectedGoalIds,
+            'selectedPrimaryGoalId' => $selectedPrimaryGoalId,
         ];
     }
 
@@ -805,7 +827,8 @@ final class OnboardingController
     {
         $repo = $this->app->make(OnboardingRepository::class);
         $selectedGoalIds = $repo->getActiveGoalIdsForUser($this->userId());
-        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($selectedGoalIds);
+        $primaryGoalId = $repo->getPrimaryGoalIdForUser($this->userId()) ?? (int)($selectedGoalIds[0] ?? 0);
+        $definitions = $this->goalQuestionDefinitionsForSelectedGoals($selectedGoalIds, $primaryGoalId);
         $savedPrefValues = $repo->getGoalPreferenceValuesForUser($this->userId());
         $prefValues = $this->hasOldInput('goal_pref') ? (array)$this->oldInput('goal_pref', []) : $savedPrefValues;
 
@@ -822,6 +845,7 @@ final class OnboardingController
 
         return $this->viewData() + [
             'selectedGoalIds' => $selectedGoalIds,
+            'primaryGoalId' => $primaryGoalId,
             'goalPreferenceDefinitions' => $definitions,
             'goalPreferenceValues' => $prefValues,
             'goalTitleById' => $goalTitleById,
@@ -829,7 +853,7 @@ final class OnboardingController
         ];
     }
 
-    private function goalQuestionDefinitionsForSelectedGoals(array $goalIds): array
+    private function goalQuestionDefinitionsForSelectedGoals(array $goalIds, ?int $primaryGoalId = null): array
     {
         if ($goalIds === []) {
             return [];
@@ -842,38 +866,78 @@ final class OnboardingController
             $goalSlugById[(int)$goal['id']] = (string)($goal['slug'] ?? '');
         }
 
-        // MVP: prioritize primary goal for question rendering while keeping
-        // persistence format multi-goal compatible.
-        $primaryGoalId = (int)$goalIds[0];
+        // MVP: ask shared baseline + primary-goal questions only.
+        $primaryGoalId = (int)($primaryGoalId ?? (int)$goalIds[0]);
         $primarySlug = $goalSlugById[$primaryGoalId] ?? '';
-        $allowedKeys = $this->app->make(GoalQuestionCatalogService::class)->allowedPreferenceKeysForGoalSlug($primarySlug);
+        $catalog = $this->app->make(GoalQuestionCatalogService::class);
+        $allowedKeys = $catalog->orderedKeysForPrimaryGoalSlug($primarySlug);
         $defs = $repo->goalPreferenceDefinitions([$primaryGoalId]);
 
         if ($allowedKeys === []) {
             return $defs;
         }
 
-        return array_values(array_filter($defs, static fn(array $def): bool => in_array((string)($def['pref_key'] ?? ''), $allowedKeys, true)));
+        $defsByKey = [];
+        foreach ($defs as $def) {
+            $defsByKey[(string)($def['pref_key'] ?? '')] = $def;
+        }
+        $ordered = [];
+        foreach ($allowedKeys as $key) {
+            if (isset($defsByKey[$key])) {
+                $ordered[] = $defsByKey[$key];
+            }
+        }
+
+        return $ordered;
     }
 
-    private function validateGoalPreferenceAnswers(array $definitions, array $input): array
+    private function validateGoalPreferenceAnswers(array $definitions, array $input, array $goalSlugById): array
     {
         $errors = [];
+        $catalog = $this->app->make(GoalQuestionCatalogService::class);
         foreach ($definitions as $def) {
             $goalId = (int)$def['goal_id'];
             $prefKey = (string)$def['pref_key'];
             $isRequired = (int)($def['is_required'] ?? 0) === 1;
             $allowed = array_values(array_filter((array)($def['allowed_values'] ?? []), static fn(mixed $v): bool => is_string($v) && trim($v) !== ''));
-            $value = trim((string)($input[$goalId][$prefKey] ?? ''));
+            $inputType = (string)($def['input_type'] ?? 'select');
+            $rawValue = $input[$goalId][$prefKey] ?? null;
+            $isSensitiveGoal = $catalog->isSensitiveGoalSlug((string)($goalSlugById[$goalId] ?? ''));
 
+            if ($inputType === 'multiselect') {
+                $values = array_values(array_filter(array_map(static fn(mixed $v): string => trim((string)$v), (array)$rawValue), static fn(string $v): bool => $v !== ''));
+                if ($values === []) {
+                    if ($isRequired) {
+                        $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_required';
+                    }
+                    continue;
+                }
+                if ($allowed !== []) {
+                    foreach ($values as $value) {
+                        if (!in_array($value, $allowed, true)) {
+                            $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_invalid';
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            $value = trim((string)$rawValue);
             if ($value === '') {
                 if ($isRequired) {
                     $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_required';
                 }
                 continue;
             }
+
             if ($allowed !== [] && !in_array($value, $allowed, true)) {
                 $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_invalid';
+                continue;
+            }
+
+            if ($isSensitiveGoal && $catalog->isStrictSensitiveKey($prefKey) && in_array($value, ['not_sure', 'unsure'], true)) {
+                $errors["goal_pref.{$goalId}.{$prefKey}"][] = 'validation.goal_pref_sensitive_explicit_required';
             }
         }
 

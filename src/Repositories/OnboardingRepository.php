@@ -81,15 +81,32 @@ final class OnboardingRepository
         }
     }
 
-    public function replaceGoals(int $userId, array $goalIds): void
+    public function replaceGoals(int $userId, array $goalIds, ?int $primaryGoalId = null): void
     {
         $this->pdo->prepare('DELETE FROM user_goals WHERE user_id = :uid')->execute(['uid' => $userId]);
         $stmt = $this->pdo->prepare('INSERT INTO user_goals (user_id, goal_id, priority, status, created_at, updated_at) VALUES (:uid, :goal, :priority, :status, NOW(), NOW())');
 
+        $orderedGoalIds = array_values(array_unique(array_map('intval', $goalIds)));
+        if ($primaryGoalId !== null && in_array($primaryGoalId, $orderedGoalIds, true)) {
+            $orderedGoalIds = array_values(array_filter($orderedGoalIds, static fn(int $id): bool => $id !== $primaryGoalId));
+            array_unshift($orderedGoalIds, $primaryGoalId);
+        }
+
         $priority = 1;
-        foreach ($goalIds as $goalId) {
+        foreach ($orderedGoalIds as $goalId) {
             $stmt->execute(['uid' => $userId, 'goal' => (int)$goalId, 'priority' => $priority++, 'status' => 'active']);
         }
+    }
+
+    public function getPrimaryGoalIdForUser(int $userId): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT goal_id FROM user_goals WHERE user_id = :uid AND status = 'active' ORDER BY priority ASC LIMIT 1"
+        );
+        $stmt->execute(['uid' => $userId]);
+        $goalId = $stmt->fetchColumn();
+
+        return $goalId === false ? null : (int)$goalId;
     }
 
     public function activeGoalIds(array $goalIds): array
@@ -227,7 +244,7 @@ final class OnboardingRepository
             );
             $insert = $this->pdo->prepare(
                 'INSERT INTO user_goal_preferences (user_goal_id, preference_def_id, value_string, value_number, value_bool, value_json, created_at, updated_at)
-                 VALUES (:user_goal_id, :def_id, :value_string, NULL, NULL, NULL, :created_at, :updated_at)'
+                 VALUES (:user_goal_id, :def_id, :value_string, NULL, NULL, :value_json, :created_at, :updated_at)'
             );
             $now = date('Y-m-d H:i:s');
 
@@ -238,10 +255,25 @@ final class OnboardingRepository
                 }
                 foreach ($prefValues as $prefKey => $value) {
                     $prefKey = trim((string)$prefKey);
-                    $value = trim((string)$value);
-                    if ($prefKey === '' || $value === '') {
+                    if ($prefKey === '') {
                         continue;
                     }
+
+                    $valueString = null;
+                    $valueJson = null;
+                    if (is_array($value)) {
+                        $normalized = array_values(array_filter(array_map(static fn(mixed $v): string => trim((string)$v), $value), static fn(string $v): bool => $v !== ''));
+                        if ($normalized === []) {
+                            continue;
+                        }
+                        $valueJson = json_encode($normalized, JSON_UNESCAPED_UNICODE);
+                    } else {
+                        $valueString = trim((string)$value);
+                        if ($valueString === '') {
+                            continue;
+                        }
+                    }
+
                     $defStmt->execute(['goal_id' => $goalId, 'pref_key' => $prefKey]);
                     $defId = $defStmt->fetchColumn();
                     if ($defId === false) {
@@ -250,7 +282,8 @@ final class OnboardingRepository
                     $insert->execute([
                         'user_goal_id' => $goalToUserGoalId[$goalId],
                         'def_id' => (int)$defId,
-                        'value_string' => $value,
+                        'value_string' => $valueString,
+                        'value_json' => $valueJson,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
@@ -269,7 +302,7 @@ final class OnboardingRepository
     public function getGoalPreferenceValuesForUser(int $userId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT ug.goal_id, gpd.pref_key, ugp.value_string
+            'SELECT ug.goal_id, gpd.pref_key, ugp.value_string, ugp.value_json
              FROM user_goal_preferences ugp
              JOIN user_goals ug ON ug.id = ugp.user_goal_id
              JOIN goal_preference_definitions gpd ON gpd.id = ugp.preference_def_id
@@ -280,7 +313,15 @@ final class OnboardingRepository
         foreach ($stmt->fetchAll() as $row) {
             $goalId = (int)$row['goal_id'];
             $prefKey = (string)$row['pref_key'];
-            $result[$goalId][$prefKey] = (string)$row['value_string'];
+            $json = (string)($row['value_json'] ?? '');
+            if ($json !== '') {
+                $decoded = json_decode($json, true);
+                if (is_array($decoded)) {
+                    $result[$goalId][$prefKey] = array_values(array_map(static fn(mixed $v): string => (string)$v, $decoded));
+                    continue;
+                }
+            }
+            $result[$goalId][$prefKey] = (string)($row['value_string'] ?? '');
         }
 
         return $result;
@@ -304,7 +345,14 @@ final class OnboardingRepository
         foreach ($requiredDefs as $def) {
             $goalId = (int)$def['goal_id'];
             $prefKey = (string)$def['pref_key'];
-            $value = trim((string)($saved[$goalId][$prefKey] ?? ''));
+            $raw = $saved[$goalId][$prefKey] ?? '';
+            if (is_array($raw)) {
+                if ($raw === []) {
+                    return false;
+                }
+                continue;
+            }
+            $value = trim((string)$raw);
             if ($value === '') {
                 return false;
             }

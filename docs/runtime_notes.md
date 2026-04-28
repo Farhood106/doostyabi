@@ -215,6 +215,23 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
   - UI renders question catalog for **primary selected goal** (first active goal by priority),
   - persistence format remains compatible with multi-goal (`goal_pref[goal_id][pref_key]`).
 
+## Production goal question system (phase B)
+
+- Goals step supports multi-select plus required **primary goal** selection.
+- Active goals are saved in `user_goals`; primary goal is represented by `priority = 1` (no extra schema required).
+- Shared baseline questions are asked once and reused by primary-goal question flow:
+  - `must.boundary_respect`
+  - `privacy.discretion_level`
+  - `pace.response_cadence`
+  - `involvement.time_intensity`
+- Initial onboarding asks only **primary-goal detailed questions**; secondary-goal details are deferred to later “improve match quality” prompts.
+- On revisit/prefill, priority is:
+  - failed submit session input (`_old`) first,
+  - then saved DB values from `user_goal_preferences`.
+- Sensitive-goal strictness (casual/support):
+  - `not_sure` / `unsure` on strict keys (consent/boundary/privacy/transparency) is treated as invalid for matching eligibility.
+  - users must provide explicit compatible values before sensitive matching.
+
 ## Goal-question catalog design
 
 - Catalog logic is centralized in `GoalQuestionCatalogService`.

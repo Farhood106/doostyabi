@@ -45,16 +45,18 @@ $values = array_column($boundaries, 'boundary_value');
 oassert(in_array('no_personal_details_early', $values, true) && in_array('no_recording_without_consent', $values, true), 'boundary readback should preserve values');
 
 // Goal preferences save/readback.
-$repo->replaceGoals(7, [1, 2]);
+$repo->replaceGoals(7, [1, 2], 2);
+$goalOrder = $repo->getActiveGoalIdsForUser(7);
+oassert($goalOrder === [2, 1], 'primary goal should be stored with highest priority');
 $stateBeforePrefs = $repo->completionState(7);
 oassert(($stateBeforePrefs['goal_questions'] ?? true) === false, 'goal-questions step should be incomplete before saving required answers');
 $repo->replaceGoalPreferenceValues(7, [
     1 => ['travel_style' => 'economy'],
-    2 => ['relationship_pace' => 'balanced'],
+    2 => ['relationship_pace' => ['balanced']],
 ]);
 $prefs = $repo->getGoalPreferenceValuesForUser(7);
 oassert(($prefs[1]['travel_style'] ?? '') === 'economy', 'goal preference 1 should persist');
-oassert(($prefs[2]['relationship_pace'] ?? '') === 'balanced', 'goal preference 2 should persist');
+oassert(($prefs[2]['relationship_pace'][0] ?? '') === 'balanced', 'goal preference 2 should persist (array/json path)');
 $stateAfterPrefs = $repo->completionState(7);
 oassert(($stateAfterPrefs['goal_questions'] ?? false) === true, 'goal-questions step should be complete after required answers');
 
