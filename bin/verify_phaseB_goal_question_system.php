@@ -28,7 +28,7 @@ $pdo->exec('CREATE TABLE user_goals (id INTEGER PRIMARY KEY AUTOINCREMENT, user_
 $pdo->exec('CREATE TABLE goal_preference_definitions (id INTEGER PRIMARY KEY AUTOINCREMENT, goal_id INTEGER, pref_key TEXT, label_key TEXT, helper_text_key TEXT, input_type TEXT, value_type TEXT, allowed_values_json TEXT, weight REAL, is_required INTEGER, is_active INTEGER)');
 $pdo->exec('CREATE TABLE user_goal_preferences (id INTEGER PRIMARY KEY AUTOINCREMENT, user_goal_id INTEGER, preference_def_id INTEGER, value_string TEXT, value_number REAL, value_bool INTEGER, value_json TEXT, created_at TEXT, updated_at TEXT)');
 
-$pdo->exec("INSERT INTO goals (id, slug, is_active) VALUES (1,'friendly_conversation',1), (2,'casual_connection',1)");
+$pdo->exec("INSERT INTO goals (id, slug, is_active) VALUES (1,'friendly_conversation',1), (2,'casual_connection',1), (3,'emotional_connection',1)");
 $pdo->exec("INSERT INTO goal_preference_definitions (goal_id, pref_key, label_key, helper_text_key, input_type, value_type, allowed_values_json, weight, is_required, is_active) VALUES
     (2,'must.consent_style','x',NULL,'select','string','[\"affirmative_and_ongoing\",\"not_sure\"]',1,1,1),
     (2,'accept.emotional_involvement_level','x',NULL,'multiselect','json','[\"low\",\"moderate\"]',1,0,1),
@@ -36,6 +36,11 @@ $pdo->exec("INSERT INTO goal_preference_definitions (goal_id, pref_key, label_ke
 
 $repo = new OnboardingRepository($pdo);
 $catalog = new GoalQuestionCatalogService();
+
+// 0) Missing DB definitions should fallback to code catalog for supported goals.
+$fallbackEmotional = $repo->goalPreferenceDefinitions([3]);
+bassert(count($fallbackEmotional) >= 4, 'emotional goal should fallback to non-empty question definitions');
+bassert(in_array('seek.emotional_climate', array_column($fallbackEmotional, 'pref_key'), true), 'emotional fallback should include seek.emotional_climate');
 
 // 1) Primary goal save/load.
 $repo->replaceGoals(9, [1, 2], 2);

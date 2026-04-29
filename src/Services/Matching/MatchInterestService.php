@@ -43,13 +43,20 @@ final class MatchInterestService
             'undo' => 'none',
         };
 
+        $canonicalMatchId = $this->repo->canonicalMatchIdForPair($a, $b) ?? $matchId;
+        $participants = $this->repo->matchParticipants($canonicalMatchId) ?? $participants;
+        $a = (int)$participants['user_a_id'];
+        $b = (int)$participants['user_b_id'];
+        $alreadyChatId = $this->repo->chatByMatchId($canonicalMatchId);
+        $alreadyOpen = ((string)$participants['status'] === 'chat_open') && $alreadyChatId !== null;
+
         $this->repo->begin();
         try {
-            $this->repo->appendAction($matchId, $actorUserId, $action);
-            $this->repo->upsertInterestState($matchId, $actorUserId, $currentInterest);
+            $this->repo->appendAction($canonicalMatchId, $actorUserId, $action);
+            $this->repo->upsertInterestState($canonicalMatchId, $actorUserId, $currentInterest);
 
             $stateMap = [];
-            foreach ($this->repo->interestStatesByMatch($matchId) as $row) {
+            foreach ($this->repo->interestStatesByMatch($canonicalMatchId) as $row) {
                 $stateMap[(int)$row['user_id']] = (string)$row['current_interest'];
             }
 
@@ -57,7 +64,7 @@ final class MatchInterestService
             $bState = $stateMap[$b] ?? 'none';
 
             $result = [
-                'match_id' => $matchId,
+                'match_id' => $canonicalMatchId,
                 'actor_interest' => $currentInterest,
                 'match_status' => (string)$participants['status'],
                 'chat_created' => false,
@@ -65,34 +72,34 @@ final class MatchInterestService
             ];
 
             if ($aState === 'interested' && $bState === 'interested') {
-                // Chosen lifecycle: suggested -> mutual -> chat_open (immediately when mutual confirmed)
-                $this->repo->updateMatchStatus($matchId, 'mutual');
-                $chatId = $this->repo->ensureChatExists($matchId);
-                $this->repo->updateMatchStatus($matchId, 'chat_open');
+                $this->repo->updateMatchStatus($canonicalMatchId, 'mutual');
+                $chatId = $this->repo->ensureChatExists($canonicalMatchId);
+                $this->repo->updateMatchStatus($canonicalMatchId, 'chat_open');
+                $this->repo->syncPairStatusToCanonical($canonicalMatchId, $a, $b, 'chat_open');
 
                 $result['match_status'] = 'chat_open';
-                $result['chat_created'] = true;
+                $result['chat_created'] = !$alreadyOpen;
                 $result['chat_id'] = $chatId;
             } elseif ($aState === 'passed' || $bState === 'passed') {
                 // Keep match in suggested but pass state hides cards from the passer in delivery.
-                $this->repo->updateMatchStatus($matchId, 'suggested');
+                $this->repo->updateMatchStatus($canonicalMatchId, 'suggested');
                 $result['match_status'] = 'suggested';
             } elseif (($aState === 'interested' && $bState === 'none') || ($bState === 'interested' && $aState === 'none')) {
-                $this->repo->updateMatchStatus($matchId, 'interested_one_side');
+                $this->repo->updateMatchStatus($canonicalMatchId, 'interested_one_side');
                 $result['match_status'] = 'interested_one_side';
             } elseif ($aState === 'none' || $bState === 'none') {
-                $this->repo->updateMatchStatus($matchId, 'suggested');
+                $this->repo->updateMatchStatus($canonicalMatchId, 'suggested');
                 $result['match_status'] = 'suggested';
             }
 
             $this->repo->commit();
             if (($result['chat_created'] ?? false) === true) {
-                $this->notifications?->emit('mutual_interest_created', $a, $actorUserId, 'match', $matchId, ['chat_id' => $result['chat_id']]);
-                $this->notifications?->emit('mutual_interest_created', $b, $actorUserId, 'match', $matchId, ['chat_id' => $result['chat_id']]);
+                $this->notifications?->emit('mutual_interest_created', $a, $actorUserId, 'match', $canonicalMatchId, ['chat_id' => $result['chat_id']]);
+                $this->notifications?->emit('mutual_interest_created', $b, $actorUserId, 'match', $canonicalMatchId, ['chat_id' => $result['chat_id']]);
 
                 if ($this->pdo !== null && !empty($result['chat_id'])) {
                     $chatService = new ChatService(new ChatRepository($this->pdo), new GoalAwareStarterPromptService());
-                    $chatService->ensureGoalStarterPromptMessages((int)$result['chat_id'], $a, $matchId);
+                    $chatService->ensureGoalStarterPromptMessages((int)$result['chat_id'], $a, $canonicalMatchId);
                 }
             }
 

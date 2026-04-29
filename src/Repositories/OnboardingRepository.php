@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Services\GoalQuestionCatalogService;
 use PDO;
 
 final class OnboardingRepository
@@ -203,6 +204,40 @@ final class OnboardingRepository
             $row['allowed_values'] = json_decode((string)($row['allowed_values_json'] ?? '[]'), true) ?? [];
         }
 
+        $rowsByGoal = [];
+        foreach ($rows as $row) {
+            $rowsByGoal[(int)$row['goal_id']][] = $row;
+        }
+
+        foreach ($goalIds as $goalIdRaw) {
+            $goalId = (int)$goalIdRaw;
+            if (($rowsByGoal[$goalId] ?? []) !== []) {
+                continue;
+            }
+            $slug = $this->goalSlugById($goalId);
+            if ($slug === '') {
+                continue;
+            }
+            $fallback = (new GoalQuestionCatalogService())->fallbackDefinitionsForGoalSlug($slug, $goalId);
+            if ($fallback === []) {
+                continue;
+            }
+            error_log(sprintf('[onboarding.goal_questions] using fallback in-code definitions for goal_id=%d slug=%s', $goalId, $slug));
+            $rowsByGoal[$goalId] = $fallback;
+        }
+
+        $merged = [];
+        foreach ($goalIds as $goalIdRaw) {
+            $goalId = (int)$goalIdRaw;
+            foreach (($rowsByGoal[$goalId] ?? []) as $row) {
+                $merged[] = $row;
+            }
+        }
+
+        if ($merged !== []) {
+            return $merged;
+        }
+
         return $rows;
     }
 
@@ -364,5 +399,17 @@ final class OnboardingRepository
     private function isSqlite(): bool
     {
         return $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    }
+
+    private function goalSlugById(int $goalId): string
+    {
+        try {
+            $stmt = $this->pdo->prepare('SELECT slug FROM goals WHERE id = :id LIMIT 1');
+            $stmt->execute(['id' => $goalId]);
+            $slug = $stmt->fetchColumn();
+            return $slug === false ? '' : trim((string)$slug);
+        } catch (\Throwable) {
+            return '';
+        }
     }
 }

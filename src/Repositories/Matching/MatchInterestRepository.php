@@ -19,6 +19,34 @@ final class MatchInterestRepository
         return $row ?: null;
     }
 
+    public function canonicalMatchIdForPair(int $userAId, int $userBId): ?int
+    {
+        $a = min($userAId, $userBId);
+        $b = max($userAId, $userBId);
+        $stmt = $this->pdo->prepare(
+            "SELECT m.id
+             FROM matches m
+             LEFT JOIN chats c ON c.match_id = m.id
+             WHERE m.user_a_id = :a AND m.user_b_id = :b
+             ORDER BY
+               CASE
+                 WHEN m.status = 'chat_open' THEN 0
+                 WHEN c.id IS NOT NULL THEN 1
+                 WHEN m.status = 'mutual' THEN 2
+                 WHEN m.status = 'interested_one_side' THEN 3
+                 ELSE 4
+               END ASC,
+               m.mutual_score DESC,
+               m.updated_at DESC,
+               m.id DESC
+             LIMIT 1"
+        );
+        $stmt->execute(['a' => $a, 'b' => $b]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int)$id;
+    }
+
     public function appendAction(int $matchId, int $actorUserId, string $action): void
     {
         $stmt = $this->pdo->prepare(
@@ -98,6 +126,24 @@ final class MatchInterestRepository
         $id = $stmt->fetchColumn();
 
         return $id === false ? null : (int)$id;
+    }
+
+    public function syncPairStatusToCanonical(int $canonicalMatchId, int $userAId, int $userBId, string $status): void
+    {
+        $a = min($userAId, $userBId);
+        $b = max($userAId, $userBId);
+        $stmt = $this->pdo->prepare(
+            'UPDATE matches
+             SET status = :status, updated_at = :updated
+             WHERE user_a_id = :a AND user_b_id = :b AND id <> :canonical_id'
+        );
+        $stmt->execute([
+            'status' => $status,
+            'updated' => date('Y-m-d H:i:s'),
+            'a' => $a,
+            'b' => $b,
+            'canonical_id' => $canonicalMatchId,
+        ]);
     }
 
     public function begin(): void

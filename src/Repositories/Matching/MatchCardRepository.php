@@ -244,7 +244,14 @@ final class MatchCardRepository
                AND m.user_a_id <> m.user_b_id
                AND m.status IN ('suggested', 'interested_one_side', 'mutual', 'chat_open')
                AND COALESCE(mis.current_interest, 'none') <> 'passed'
-             ORDER BY mc.compatibility_score DESC, mc.updated_at DESC, mc.id DESC
+             ORDER BY
+               CASE m.status
+                 WHEN 'chat_open' THEN 0
+                 WHEN 'mutual' THEN 1
+                 WHEN 'interested_one_side' THEN 2
+                 ELSE 3
+               END ASC,
+               mc.compatibility_score DESC, mc.updated_at DESC, mc.id DESC
              LIMIT :limit OFFSET :offset"
         );
         $stmt->bindValue(':uid', $viewerUserId, PDO::PARAM_INT);

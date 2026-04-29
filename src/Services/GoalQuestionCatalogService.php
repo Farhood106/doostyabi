@@ -146,4 +146,83 @@ final class GoalQuestionCatalogService
     {
         return in_array($prefKey, self::SENSITIVE_STRICT_PREF_KEYS, true);
     }
+
+    /** @return array<int,array<string,mixed>> */
+    public function fallbackDefinitionsForGoalSlug(string $goalSlug, int $goalId): array
+    {
+        $defs = match ($goalSlug) {
+            'emotional_connection' => [
+                $this->def($goalId, 'seek.emotional_climate', 'onboarding.goal_pref.seek_emotional_climate.label', 'onboarding.goal_pref.seek_emotional_climate.helper', 'select', ['calm', 'warm', 'deep'], 1),
+                $this->def($goalId, 'offer.emotional_availability', 'onboarding.goal_pref.offer_emotional_availability.label', 'onboarding.goal_pref.offer_emotional_availability.helper', 'select', ['light_checkins', 'steady_support', 'high_presence'], 1),
+                $this->def($goalId, 'pace.connection_speed', 'onboarding.goal_pref.pace_connection_speed.label', null, 'select', ['slow', 'moderate', 'fast'], 1),
+                $this->def($goalId, 'duration.relationship_horizon', 'onboarding.goal_pref.duration_relationship_horizon.label', null, 'select', ['explore_1_3_months', 'mid_term', 'long_term_open'], 1),
+                $this->def($goalId, 'accept.communication_style', 'onboarding.goal_pref.accept_communication_style.label', null, 'multiselect', ['text_short', 'voice', 'scheduled_calls', 'infrequent_ok'], 0),
+            ],
+            'long_term_relationship' => [
+                $this->def($goalId, 'must.commitment_intent', 'onboarding.goal_pref.must_commitment_intent.label', null, 'select', ['explicit_long_term', 'long_term_preferred', 'open_but_unsure'], 1),
+                $this->def($goalId, 'seek.stability_level', 'onboarding.goal_pref.seek_stability_level.label', null, 'select', ['steady', 'highly_structured', 'flexible_but_reliable'], 1),
+                $this->def($goalId, 'offer.consistency_level', 'onboarding.goal_pref.offer_consistency_level.label', null, 'select', ['weekly_reliable', 'high_reliability', 'moderate_reliability'], 1),
+                $this->def($goalId, 'pace.commitment_pace', 'onboarding.goal_pref.pace_commitment_pace.label', null, 'select', ['slow_intentional', 'moderate', 'fast_if_aligned'], 1),
+            ],
+            'travel_companion', 'event_companion', 'social_activity_partner' => [
+                $this->def($goalId, 'seek.activity_type', 'onboarding.goal_pref.seek_activity_type.label', null, 'multiselect', ['city_walk', 'museum', 'food_explore', 'hiking', 'road_trip'], 1),
+                $this->def($goalId, 'offer.planning_style', 'onboarding.goal_pref.offer_planning_style.label', null, 'select', ['structured', 'hybrid', 'spontaneous'], 1),
+                $this->def($goalId, 'accept.budget_band', 'onboarding.goal_pref.accept_budget_band.label', null, 'select', ['low', 'medium', 'high', 'mixed_by_plan'], 1),
+                $this->def($goalId, 'must.public_meet_first', 'onboarding.goal_pref.must_public_meet_first.label', null, 'select', ['required', 'not_required'], 1),
+            ],
+            'sports_companion' => [
+                $this->def($goalId, 'seek.activity_intensity', 'onboarding.goal_pref.seek_activity_intensity.label', null, 'select', ['light', 'moderate', 'high'], 1),
+                $this->def($goalId, 'offer.activity_intensity', 'onboarding.goal_pref.offer_activity_intensity.label', null, 'select', ['light', 'moderate', 'high'], 1),
+                $this->def($goalId, 'pace.session_cadence', 'onboarding.goal_pref.pace_session_cadence.label', null, 'select', ['weekly', '2_3_week', 'daily'], 1),
+                $this->def($goalId, 'must.safety_boundary_respect', 'onboarding.goal_pref.must_safety_boundary_respect.label', null, 'select', ['required', 'not_sure'], 1),
+            ],
+            'project_collaboration', 'co_living' => [
+                $this->def($goalId, 'seek.partner_role', 'onboarding.goal_pref.seek_partner_role.label', null, 'multiselect', ['planner', 'builder', 'designer', 'operator', 'researcher'], 1),
+                $this->def($goalId, 'offer.role', 'onboarding.goal_pref.offer_role.label', null, 'multiselect', ['planner', 'builder', 'designer', 'operator', 'researcher'], 1),
+                $this->def($goalId, 'accept.collab_format', 'onboarding.goal_pref.accept_collab_format.label', null, 'multiselect', ['async', 'weekly_sync', 'daily_sync'], 1),
+                $this->def($goalId, 'must.commitment_reliability', 'onboarding.goal_pref.must_commitment_reliability.label', null, 'select', ['required', 'not_sure'], 1),
+            ],
+            'casual_connection' => [
+                $this->def($goalId, 'seek.connection_expectation', 'onboarding.goal_pref.seek_connection_expectation.label', null, 'select', ['light_chat', 'companionship', 'low_commitment_romantic'], 1),
+                $this->def($goalId, 'accept.emotional_involvement_level', 'onboarding.goal_pref.accept_emotional_involvement_level.label', null, 'select', ['low', 'moderate'], 1),
+                $this->def($goalId, 'pace.intimacy_pace', 'onboarding.goal_pref.pace_intimacy_pace.label', null, 'select', ['very_slow', 'slow', 'mutually_set'], 1),
+                $this->def($goalId, 'must.consent_style', 'onboarding.goal_pref.must_consent_style.label', null, 'select', ['affirmative_and_ongoing', 'not_sure'], 1),
+                $this->def($goalId, 'duration.connection_window', 'onboarding.goal_pref.duration_connection_window.label', null, 'select', ['few_weeks', '1_3_months', 'open_ended_light'], 1),
+                $this->def($goalId, 'accept.appearance_preference_optional_general', 'onboarding.goal_pref.accept_appearance_preference_optional_general.label', null, 'text', [], 0),
+            ],
+            'support_based_relationship' => [
+                $this->def($goalId, 'seek.support_role', 'onboarding.goal_pref.seek_support_role.label', null, 'select', ['seek_support', 'flexible'], 1),
+                $this->def($goalId, 'seek.support_type', 'onboarding.goal_pref.seek_support_type.label', null, 'multiselect', ['mentorship', 'practical_help', 'lifestyle_support'], 1),
+                $this->def($goalId, 'offer.support_role', 'onboarding.goal_pref.offer_support_role.label', null, 'select', ['offer_support', 'flexible'], 1),
+                $this->def($goalId, 'offer.support_type', 'onboarding.goal_pref.offer_support_type.label', null, 'multiselect', ['mentorship', 'practical_help', 'lifestyle_support'], 1),
+                $this->def($goalId, 'must.transparency_level', 'onboarding.goal_pref.must_transparency_level.label', null, 'select', ['required', 'not_sure'], 1),
+                $this->def($goalId, 'duration.arrangement_horizon', 'onboarding.goal_pref.duration_arrangement_horizon.label', null, 'select', ['1_month', '3_months', '6_months_plus'], 1),
+            ],
+            default => [
+                $this->def($goalId, 'seek.social_energy', 'onboarding.goal_pref.seek_social_energy.label', null, 'select', ['quiet_low_pressure', 'balanced', 'high_energy'], 0),
+                $this->def($goalId, 'offer.social_energy', 'onboarding.goal_pref.offer_social_energy.label', null, 'select', ['calm_listener', 'balanced', 'high_energy_initiator'], 0),
+                $this->def($goalId, 'duration.friendship_intent', 'onboarding.goal_pref.duration_friendship_intent.label', null, 'select', ['explore', 'ongoing'], 1),
+            ],
+        };
+
+        return $defs;
+    }
+
+    /** @param string[] $allowed */
+    private function def(int $goalId, string $prefKey, string $labelKey, ?string $helperTextKey, string $inputType, array $allowed, int $required): array
+    {
+        return [
+            'id' => 0,
+            'goal_id' => $goalId,
+            'pref_key' => $prefKey,
+            'label_key' => $labelKey,
+            'helper_text_key' => $helperTextKey,
+            'input_type' => $inputType,
+            'value_type' => $inputType === 'multiselect' ? 'json' : 'string',
+            'allowed_values_json' => json_encode($allowed, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'allowed_values' => $allowed,
+            'is_required' => $required,
+            'is_active' => 1,
+        ];
+    }
 }

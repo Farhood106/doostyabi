@@ -237,3 +237,16 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
 - Catalog logic is centralized in `GoalQuestionCatalogService`.
 - Cluster mapping is slug-based and uses stable `pref_key` identifiers.
 - Definitions remain DB-driven through `goal_preference_definitions` (admin-ready path).
+- If DB definitions are missing for a goal, onboarding temporarily falls back to in-code catalog defaults and writes an admin-facing error-log warning (`onboarding.goal_questions`) while keeping user UI clean.
+
+## Admin-ready strategy (next phase, no panel yet)
+
+- Keep `goals` table as source of truth for enable/disable + ordering.
+- Keep `goal_preference_definitions` as source for question definitions and answer options.
+- Add lightweight admin APIs/pages later to manage:
+  - goal activation and sort order,
+  - question enable/disable and required flags,
+  - `allowed_values_json` options,
+  - label/helper i18n keys,
+  - card explanation template keys.
+- Keep fallback catalog in code as safety net only; production should prefer DB-managed definitions.
