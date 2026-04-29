@@ -11,4 +11,5 @@ return [
     'fallback_locale' => 'en',
     'default_direction' => 'rtl',
     'session_name' => 'doostyabi_session',
+    'admin_user_ids' => $_ENV['APP_ADMIN_USER_IDS'] ?? '1',
 ];

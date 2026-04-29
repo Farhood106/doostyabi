@@ -250,3 +250,23 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
   - label/helper i18n keys,
   - card explanation template keys.
 - Keep fallback catalog in code as safety net only; production should prefer DB-managed definitions.
+
+## MVP admin management (current)
+
+- Temporary admin check is config-based by user id allowlist (`APP_ADMIN_USER_IDS`, default: `1`).
+- Routes:
+  - `GET /admin`
+  - `GET /admin/goals`
+  - `GET /admin/goal-questions`
+  - `POST /admin/goal-questions/save`
+  - `POST /admin/goal-questions/toggle`
+- Capabilities:
+  - list goals,
+  - list question definitions by goal,
+  - add/update definition fields (`pref_key`, `label_key`, `helper_text_key`, `input_type`, `value_type`, `allowed_values_json`, `is_required`, `weight`, `is_active`),
+  - toggle enabled state.
+
+## Seed / repair helper for goal questions
+
+- Run `php bin/seed_goal_question_definitions.php` to backfill/repair `goal_preference_definitions` for all active goals.
+- Script is safe to rerun (upsert behavior) and also seeds missing option i18n labels for fa/en.

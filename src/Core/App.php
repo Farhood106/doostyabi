@@ -8,6 +8,7 @@ use App\Auth\AuthService;
 use App\Database\Connection;
 use App\I18n\Translator;
 use App\Repositories\GoalRepository;
+use App\Repositories\AdminGoalQuestionRepository;
 use App\Repositories\OnboardingRepository;
 use App\Repositories\UserRepository;
 use App\Security\Csrf;
@@ -50,6 +51,7 @@ final class App
             Translator::class => new Translator($this->make(PDO::class), (string)$this->config('app.fallback_locale', 'en')),
             UserRepository::class => new UserRepository($this->make(PDO::class)),
             GoalRepository::class => new GoalRepository($this->make(PDO::class)),
+            AdminGoalQuestionRepository::class => new AdminGoalQuestionRepository($this->make(PDO::class)),
             OnboardingRepository::class => new OnboardingRepository($this->make(PDO::class)),
             OnboardingProgressService::class => new OnboardingProgressService($this->make(OnboardingRepository::class)),
             AuthService::class => new AuthService($this->make(UserRepository::class)),

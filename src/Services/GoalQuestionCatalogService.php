@@ -225,4 +225,28 @@ final class GoalQuestionCatalogService
             'is_active' => 1,
         ];
     }
+
+    public function fallbackFaOptionLabel(string $prefKey, string $value): string
+    {
+        $map = [
+            'calm' => 'آرام', 'warm' => 'گرم', 'deep' => 'عمیق',
+            'light_checkins' => 'پیگیری سبک', 'steady_support' => 'حمایت پایدار', 'high_presence' => 'حضور بالا',
+            'slow' => 'آهسته', 'moderate' => 'متوسط', 'fast' => 'سریع',
+            'explore_1_3_months' => 'آزمایشی ۱ تا ۳ ماه', 'mid_term' => 'میان‌مدت', 'long_term_open' => 'باز برای بلندمدت',
+            'city_walk' => 'پیاده‌روی شهری', 'museum' => 'موزه', 'food_explore' => 'گردش غذایی', 'hiking' => 'طبیعت‌گردی', 'road_trip' => 'سفر جاده‌ای',
+            'structured' => 'برنامه‌ریزی‌شده', 'hybrid' => 'ترکیبی', 'spontaneous' => 'خودجوش',
+            'required' => 'الزامی', 'not_required' => 'الزامی نیست', 'not_sure' => 'مطمئن نیستم',
+            'light' => 'سبک', 'high' => 'زیاد', 'weekly' => 'هفتگی', '2_3_week' => '۲-۳ بار در هفته', 'daily' => 'روزانه',
+            'planner' => 'برنامه‌ریز', 'builder' => 'سازنده', 'designer' => 'طراح', 'operator' => 'مجری', 'researcher' => 'پژوهشگر',
+            'async' => 'غیرهمزمان', 'weekly_sync' => 'همگام‌سازی هفتگی', 'daily_sync' => 'همگام‌سازی روزانه',
+            'light_chat' => 'گفت‌وگوی سبک', 'companionship' => 'همراهی', 'low_commitment_romantic' => 'رابطه کم‌تعهد',
+            'very_slow' => 'خیلی آهسته', 'mutually_set' => 'با توافق طرفین',
+            'affirmative_and_ongoing' => 'رضایت صریح و مستمر',
+            'few_weeks' => 'چند هفته', '1_3_months' => '۱ تا ۳ ماه', 'open_ended_light' => 'باز و سبک',
+            'seek_support' => 'نیازمند حمایت', 'offer_support' => 'ارائه‌دهنده حمایت', 'flexible' => 'منعطف',
+            'mentorship' => 'منتورینگ', 'practical_help' => 'کمک عملی', 'lifestyle_support' => 'حمایت سبک زندگی',
+            '1_month' => '۱ ماه', '3_months' => '۳ ماه', '6_months_plus' => '۶ ماه به بالا',
+        ];
+        return $map[$value] ?? str_replace('_', ' ', $value);
+    }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Controllers\AuthController;
+use App\Controllers\AdminController;
 use App\Controllers\ChatController;
 use App\Controllers\DashboardController;
 use App\Controllers\MatchInterestController;
@@ -42,3 +43,9 @@ $router->get('/onboarding/goals', [OnboardingController::class, 'showGoals'], [$
 $router->post('/onboarding/goals', [OnboardingController::class, 'saveGoals'], [$authMiddleware]);
 $router->get('/onboarding/goal-questions', [OnboardingController::class, 'showGoalQuestions'], [$authMiddleware]);
 $router->post('/onboarding/goal-questions', [OnboardingController::class, 'saveGoalQuestions'], [$authMiddleware]);
+
+$router->get('/admin', [AdminController::class, 'index'], [$authMiddleware]);
+$router->get('/admin/goals', [AdminController::class, 'goals'], [$authMiddleware]);
+$router->get('/admin/goal-questions', [AdminController::class, 'goalQuestions'], [$authMiddleware]);
+$router->post('/admin/goal-questions/save', [AdminController::class, 'saveGoalQuestion'], [$authMiddleware]);
+$router->post('/admin/goal-questions/toggle', [AdminController::class, 'toggleGoalQuestion'], [$authMiddleware]);
