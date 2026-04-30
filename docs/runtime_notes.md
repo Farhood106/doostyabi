@@ -200,6 +200,37 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
   - `preference_matches`
   - `preference_gaps`
 
+## Matching phase C: primary-goal + need/offer engine
+
+- Scoring now uses a primary-goal-dominant strategy:
+  - primary goal fit is the main context,
+  - secondary-goal overlap contributes lightly.
+- Need/offer fit is directional and reciprocal:
+  - source `seek.*` vs candidate `offer.*`,
+  - candidate `seek.*` vs source `offer.*`,
+  - final `need_offer_fit` is the average of both directions.
+- Missing optional preference data is neutral by default.
+- Sensitive-goal strictness is hard-enforced for casual/support clusters:
+  - `not_sure` / `unsure` / empty on strict consent/boundary/privacy/transparency keys causes hard rejection.
+- Score breakdown keys in queue payload now include:
+  - `primary_goal_fit`
+  - `need_offer_fit`
+  - `privacy_fit`
+  - `pace_duration_fit`
+  - `boundary_consent_fit`
+  - `availability_distance_fit`
+  - `personality_optional_fit`
+  - `penalties`
+  - `preference_matches`
+  - `preference_gaps`
+- Match explanation keys are now purpose/expectation-oriented:
+  - shared purpose,
+  - need/offer alignment,
+  - privacy alignment,
+  - boundary alignment,
+  - pace/duration alignment,
+  - caution on expectation gaps.
+
 ## Goal-specific question step (phase 2)
 
 - Onboarding flow is now:

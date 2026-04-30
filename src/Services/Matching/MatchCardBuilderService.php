@@ -59,8 +59,12 @@ final class MatchCardBuilderService
                 'compatibility_score' => (float)$row['compatibility_score'],
                 'emotional_summary_key' => $this->emotionalSummary->buildKey($scoreBreakdown, $viewer, $candidate),
                 'match_reasons_json' => $this->safeReasons($topReasons),
+                'match_intro_key' => 'match.intro.why_introduced',
+                'primary_goal_context_key' => 'match.intro.primary_goal_context',
+                'expectation_alignment_key' => 'match.intro.expectation_alignment',
+                'first_conversation_key' => 'match.intro.discuss_first',
                 'communication_boundaries_json' => $this->safeCommunicationBoundaries((array)$candidate['boundaries']),
-                'schedule_overlap_key' => $this->scheduleOverlapKey((float)($scoreBreakdown['schedule_overlap'] ?? 0)),
+                'schedule_overlap_key' => $this->scheduleOverlapKey((float)($scoreBreakdown['availability_distance_fit'] ?? 0)),
                 'card_version' => $this->cardVersion,
             ];
 

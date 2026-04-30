@@ -8,61 +8,62 @@ final class CompatibilityScoringService
 {
     public function score(array $source, array $candidate, array $goalOverlap): array
     {
+        $primaryGoalId = (int)($source['goals'][0] ?? 0);
+        $primaryInOverlap = $primaryGoalId > 0 && in_array($primaryGoalId, array_map('intval', $goalOverlap), true);
+        $secondaryOverlapCount = max(0, count($goalOverlap) - ($primaryInOverlap ? 1 : 0));
+        $primaryGoalFit = $primaryInOverlap ? min(100.0, 75.0 + ($secondaryOverlapCount * 10.0)) : 35.0;
+
+        $needOffer = $this->needOfferFit($source, $candidate, $goalOverlap, $primaryGoalId);
+        $privacyFit = $this->namespaceFit($source, $candidate, $goalOverlap, 'privacy.');
+        $paceDurationFit = $this->namespaceFit($source, $candidate, $goalOverlap, 'pace.', 'duration.');
+        $boundaryConsentFit = $this->boundaryConsentFit($source, $candidate, $goalOverlap);
+        $availabilityDistanceFit = (($this->distanceFit($source, $candidate) * 0.6) + ($this->scheduleOverlapSymmetric($source['availability'], $candidate['availability']) * 0.4));
+        $personalityOptionalFit = (($this->dimensionSimilarity($source, $candidate) * 0.8) + ($this->lifestyleSimilarity($source, $candidate) * 0.2));
+        $penalties = $needOffer['penalties'];
+
         $weights = [
-            'goal_alignment' => 20,
-            'dimensions' => 35,
-            'lifestyle' => 10,
-            'distance_fit' => 10,
-            'schedule_overlap' => 15,
-            'mutual_preference_fit' => 5,
-            'goal_specific_fit' => 5,
+            'primary_goal_fit' => 24,
+            'need_offer_fit' => 26,
+            'privacy_fit' => 12,
+            'pace_duration_fit' => 10,
+            'boundary_consent_fit' => 16,
+            'availability_distance_fit' => 10,
+            'personality_optional_fit' => 2,
         ];
-
-        $goalAlignment = min(100.0, count($goalOverlap) * 50.0);
-        $dimensions = $this->dimensionSimilarity($source, $candidate);
-        $lifestyle = $this->lifestyleSimilarity($source, $candidate);
-        $distance = $this->distanceFit($source, $candidate);
-        $schedule = $this->scheduleOverlapSymmetric($source['availability'], $candidate['availability']);
-        $mutualPref = $this->mutualPreferenceFit($source, $candidate);
-        $goalSpecific = $this->goalSpecificFit($source, $candidate, $goalOverlap);
-
         $weighted =
-            ($goalAlignment * $weights['goal_alignment']) +
-            ($dimensions * $weights['dimensions']) +
-            ($lifestyle * $weights['lifestyle']) +
-            ($distance * $weights['distance_fit']) +
-            ($schedule * $weights['schedule_overlap']) +
-            ($mutualPref * $weights['mutual_preference_fit']) +
-            ($goalSpecific['score'] * $weights['goal_specific_fit']);
-
-        $score = round($weighted / 100, 2);
+            ($primaryGoalFit * $weights['primary_goal_fit']) +
+            ($needOffer['score'] * $weights['need_offer_fit']) +
+            ($privacyFit * $weights['privacy_fit']) +
+            ($paceDurationFit * $weights['pace_duration_fit']) +
+            ($boundaryConsentFit * $weights['boundary_consent_fit']) +
+            ($availabilityDistanceFit * $weights['availability_distance_fit']) +
+            ($personalityOptionalFit * $weights['personality_optional_fit']);
+        $score = round(max(0.0, ($weighted / 100.0) - $penalties), 2);
 
         $breakdown = [
-            'goal_alignment' => round($goalAlignment, 2),
-            'dimensions' => round($dimensions, 2),
-            'lifestyle' => round($lifestyle, 2),
-            'distance_fit' => round($distance, 2),
-            'schedule_overlap' => round($schedule, 2),
-            'mutual_preference_fit' => round($mutualPref, 2),
-            'goal_specific_fit' => round((float)$goalSpecific['score'], 2),
-            'shared_goal_keys' => $goalSpecific['shared_goal_keys'],
-            'preference_matches' => $goalSpecific['preference_matches'],
-            'preference_gaps' => $goalSpecific['preference_gaps'],
+            'primary_goal_fit' => round($primaryGoalFit, 2),
+            'need_offer_fit' => round((float)$needOffer['score'], 2),
+            'privacy_fit' => round($privacyFit, 2),
+            'pace_duration_fit' => round($paceDurationFit, 2),
+            'boundary_consent_fit' => round($boundaryConsentFit, 2),
+            'availability_distance_fit' => round($availabilityDistanceFit, 2),
+            'personality_optional_fit' => round($personalityOptionalFit, 2),
+            'penalties' => round($penalties, 2),
+            'preference_matches' => $needOffer['matches'],
+            'preference_gaps' => $needOffer['gaps'],
             'weights' => $weights,
         ];
 
         $reasons = [];
-        if ($dimensions >= 75) $reasons[] = 'explanation.similar_core_dimensions';
-        if ($schedule >= 60) $reasons[] = 'explanation.schedule_overlap_good';
-        if ($goalAlignment >= 50) $reasons[] = 'explanation.shared_goal_intention';
-        if ($distance >= 70) $reasons[] = 'explanation.location_proximity_good';
-        if ($mutualPref >= 80) $reasons[] = 'explanation.mutual_preference_fit_good';
-        if ((float)$goalSpecific['score'] >= 75) $reasons[] = 'explanation.goal_specific_alignment_good';
-        if ((float)$goalSpecific['score'] >= 45 && (float)$goalSpecific['score'] < 75) $reasons[] = 'explanation.goal_specific_alignment_partial';
+        if ($primaryGoalFit >= 65) $reasons[] = 'explanation.shared_purpose';
+        if ($needOffer['score'] >= 65) $reasons[] = 'explanation.need_offer_alignment';
+        if ($privacyFit >= 65) $reasons[] = 'explanation.privacy_alignment';
+        if ($boundaryConsentFit >= 65) $reasons[] = 'explanation.boundary_alignment';
+        if ($paceDurationFit >= 65) $reasons[] = 'explanation.pace_duration_alignment';
 
         $cautions = [];
-        if ($lifestyle < 45) $cautions[] = 'explanation.caution_lifestyle_gap';
-        if ($distance < 50) $cautions[] = 'explanation.caution_distance';
+        if ($needOffer['score'] < 50 || $privacyFit < 50 || $boundaryConsentFit < 50) $cautions[] = 'explanation.caution_expectation_gap';
+        if ($availabilityDistanceFit < 50) $cautions[] = 'explanation.caution_distance';
 
         return [
             'compatibility_score' => $score,
@@ -70,6 +71,67 @@ final class CompatibilityScoringService
             'top_match_reasons' => $reasons,
             'caution_points' => $cautions,
         ];
+    }
+
+    private function needOfferFit(array $source, array $candidate, array $goalOverlap, int $primaryGoalId): array
+    {
+        $goalIds = $primaryGoalId > 0 ? array_unique(array_merge([$primaryGoalId], $goalOverlap)) : $goalOverlap;
+        $scores = [];
+        $matches = [];
+        $gaps = [];
+        foreach ($goalIds as $goalId) {
+            $s = (array)($source['goal_preferences'][(int)$goalId] ?? []);
+            $c = (array)($candidate['goal_preferences'][(int)$goalId] ?? []);
+            [$ab, $m1, $g1] = $this->directionalFit($s, $c, 'seek.', 'offer.');
+            [$ba, $m2, $g2] = $this->directionalFit($c, $s, 'seek.', 'offer.');
+            $scores[] = ($ab + $ba) / 2.0;
+            $matches = array_merge($matches, $m1, $m2);
+            $gaps = array_merge($gaps, $g1, $g2);
+        }
+        return ['score' => $scores ? array_sum($scores) / count($scores) : 50.0, 'matches' => array_values(array_unique($matches)), 'gaps' => array_values(array_unique($gaps)), 'penalties' => count(array_filter($gaps, static fn(string $g): bool => str_contains($g, ':missing_required'))) * 4.0];
+    }
+
+    private function directionalFit(array $seekPrefs, array $offerPrefs, string $seekPrefix, string $offerPrefix): array
+    {
+        $scores = []; $matches = []; $gaps = [];
+        foreach ($seekPrefs as $key => $seekValue) {
+            if (!str_starts_with((string)$key, $seekPrefix)) continue;
+            $offerKey = $offerPrefix . substr((string)$key, strlen($seekPrefix));
+            $offerValue = (string)($offerPrefs[$offerKey] ?? '');
+            $seekValue = (string)$seekValue;
+            if ($seekValue === '' || $offerValue === '') { $scores[] = 50.0; $gaps[] = $key . ':missing_required'; continue; }
+            if ($seekValue === $offerValue) { $scores[] = 100.0; $matches[] = $key . ':exact'; continue; }
+            $seekSet = array_values(array_filter(array_map('trim', explode(',', $seekValue))));
+            $offerSet = array_values(array_filter(array_map('trim', explode(',', $offerValue))));
+            $intersect = array_intersect($seekSet, $offerSet);
+            if ($intersect !== []) { $scores[] = 75.0; $matches[] = $key . ':overlap'; continue; }
+            $scores[] = 20.0; $gaps[] = $key . ':mismatch';
+        }
+        return [$scores ? array_sum($scores) / count($scores) : 50.0, $matches, $gaps];
+    }
+
+    private function namespaceFit(array $source, array $candidate, array $goalOverlap, string ...$prefixes): float
+    {
+        $scores = [];
+        foreach ($goalOverlap as $goalId) {
+            $a = (array)($source['goal_preferences'][(int)$goalId] ?? []);
+            $b = (array)($candidate['goal_preferences'][(int)$goalId] ?? []);
+            foreach ($a as $key => $aVal) {
+                $in = false; foreach ($prefixes as $p) { if (str_starts_with((string)$key, $p)) $in = true; }
+                if (!$in) continue;
+                $bVal = (string)($b[$key] ?? '');
+                if ((string)$aVal === '' || $bVal === '') { $scores[] = 50.0; continue; }
+                $scores[] = ((string)$aVal === $bVal) ? 100.0 : ($this->isNearbyPreference((string)$aVal, $bVal) ? 65.0 : 30.0);
+            }
+        }
+        return $scores ? array_sum($scores) / count($scores) : 50.0;
+    }
+
+    private function boundaryConsentFit(array $source, array $candidate, array $goalOverlap): float
+    {
+        $must = $this->namespaceFit($source, $candidate, $goalOverlap, 'must.');
+        $boundary = $this->namespaceFit($source, $candidate, $goalOverlap, 'accept.');
+        return ($must * 0.75) + ($boundary * 0.25);
     }
 
     private function dimensionSimilarity(array $a, array $b): float

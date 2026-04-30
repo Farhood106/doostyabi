@@ -30,6 +30,9 @@ final class HardFilterService
         if ($goalOverlap === []) {
             $reasons[] = 'goal_mismatch';
         }
+        if ($this->hasSensitiveGoalUncertainty($source, $candidate, $goalOverlap)) {
+            $reasons[] = 'sensitive_goal_uncertain_consent_or_privacy';
+        }
 
         if (!$this->ageCompatible($source, $candidate)) {
             $reasons[] = 'age_preference_mismatch';
@@ -57,6 +60,27 @@ final class HardFilterService
             'rejection_reason_codes' => $reasons,
             'goal_overlap' => $goalOverlap,
         ];
+    }
+
+    private function hasSensitiveGoalUncertainty(array $source, array $candidate, array $goalOverlap): bool
+    {
+        $sensitiveGoalIds = [10, 11];
+        $targets = array_intersect(array_map('intval', $goalOverlap), $sensitiveGoalIds);
+        if ($targets === []) {
+            return false;
+        }
+
+        $strictKeys = ['must.consent_style', 'must.boundary_respect', 'must.transparency_level', 'must.safety_boundaries', 'privacy.discretion_level'];
+        foreach ($targets as $goalId) {
+            foreach ($strictKeys as $k) {
+                $a = strtolower(trim((string)($source['goal_preferences'][(int)$goalId][$k] ?? '')));
+                $b = strtolower(trim((string)($candidate['goal_preferences'][(int)$goalId][$k] ?? '')));
+                if (in_array($a, ['not_sure', 'unsure', ''], true) || in_array($b, ['not_sure', 'unsure', ''], true)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private function ageCompatible(array $a, array $b): bool

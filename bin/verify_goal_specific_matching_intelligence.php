@@ -40,20 +40,34 @@ $baseA = [
     'interested_in_gender' => '',
     'gender_identity' => 'woman',
     'goal_preferences' => [
-        10 => ['privacy.discretion_level' => 'high_preferred', 'seek.connection_expectation' => 'companionship', 'accept.emotional_involvement_level' => 'low'],
+        10 => [
+            'privacy.discretion_level' => 'high_preferred',
+            'seek.connection_type' => 'companionship,light_chat',
+            'offer.connection_type' => 'companionship',
+            'accept.emotional_involvement_level' => 'low',
+        ],
     ],
 ];
 $baseB = $baseA;
 $baseB['gender_identity'] = 'man';
+$baseB['goal_preferences'][10]['seek.connection_type'] = 'companionship';
+$baseB['goal_preferences'][10]['offer.connection_type'] = 'companionship,light_chat';
 
 $aligned = $service->score($baseA, $baseB, [10]);
-giAssert(((float)$aligned['score_breakdown']['goal_specific_fit']) >= 90.0, 'aligned goal preferences should score high in goal_specific_fit');
-giAssert(in_array('explanation.goal_specific_alignment_good', $aligned['top_match_reasons'], true), 'aligned preferences should add goal-specific positive reason');
+giAssert(((float)$aligned['score_breakdown']['need_offer_fit']) >= 70.0, 'aligned need/offer should score high');
+giAssert(in_array('explanation.need_offer_alignment', $aligned['top_match_reasons'], true), 'aligned preferences should add need/offer reason');
 
 $mismatchB = $baseB;
-$mismatchB['goal_preferences'][10] = ['privacy.discretion_level' => 'strict_high_required', 'seek.connection_expectation' => 'light_chat', 'accept.emotional_involvement_level' => 'moderate'];
+$mismatchB['goal_preferences'][10] = [
+    'privacy.discretion_level' => 'strict_high_required',
+    'seek.connection_type' => 'light_chat',
+    'offer.connection_type' => 'low_commitment_romantic',
+    'accept.emotional_involvement_level' => 'moderate',
+];
 $mismatch = $service->score($baseA, $mismatchB, [10]);
-giAssert(((float)$mismatch['score_breakdown']['goal_specific_fit']) < ((float)$aligned['score_breakdown']['goal_specific_fit']), 'mismatch should reduce goal_specific_fit');
+giAssert(((float)$mismatch['score_breakdown']['need_offer_fit']) < ((float)$aligned['score_breakdown']['need_offer_fit']), 'mismatch should reduce need_offer_fit');
 giAssert(count((array)$mismatch['score_breakdown']['preference_gaps']) >= 1, 'mismatch should expose preference gaps');
+giAssert(isset($mismatch['score_breakdown']['primary_goal_fit']), 'phase C score breakdown should include primary_goal_fit');
+giAssert(isset($mismatch['score_breakdown']['availability_distance_fit']), 'phase C score breakdown should include availability_distance_fit');
 
 echo "OK: goal-specific matching intelligence verification passed\n";
