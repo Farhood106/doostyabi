@@ -466,6 +466,11 @@ final class OnboardingController
         foreach ($this->app->make(GoalRepository::class)->activeGoals() as $goal) {
             $goalSlugById[(int)($goal['id'] ?? 0)] = (string)($goal['slug'] ?? '');
         }
+        $primarySlug = (string)($goalSlugById[$primaryGoalId] ?? '');
+        if ($definitions === [] && $this->app->make(GoalQuestionCatalogService::class)->isSensitiveGoalSlug($primarySlug)) {
+            flash('errors', ['goal_pref' => ['validation.goal_pref_required']]);
+            Response::redirect('/onboarding/goal-questions');
+        }
         $prefErrors = $this->validateGoalPreferenceAnswers($definitions, $goalPreferences, $goalSlugById);
         if ($prefErrors !== []) {
             flash('errors', $prefErrors);

@@ -11,6 +11,7 @@ use App\Repositories\Matching\MatchCardRepository;
 use App\Repositories\NotificationRepository;
 use App\Services\Matching\MatchDeliveryService;
 use App\Services\NotificationService;
+use App\Services\OnboardingProgressService;
 use PDO;
 
 final class DashboardController
@@ -20,6 +21,14 @@ final class DashboardController
     public function index(Request $request): void
     {
         $userId = (int)($this->app->make(AuthService::class)->userId() ?? 0);
+        if ($userId > 0) {
+            $firstIncomplete = $this->app->make(OnboardingProgressService::class)->firstIncompleteStep($userId);
+            if ($firstIncomplete !== 'done') {
+                flash('message', 'برای فعال شدن معرفی‌ها، لطفاً پرسش‌های تکمیلی هدف اصلی را کامل کنید.');
+                header('Location: /onboarding/' . $firstIncomplete);
+                exit;
+            }
+        }
         $cards = [];
         $passedCards = [];
         $notifications = [];

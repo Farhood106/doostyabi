@@ -312,6 +312,9 @@ final class OnboardingRepository
                     $defStmt->execute(['goal_id' => $goalId, 'pref_key' => $prefKey]);
                     $defId = $defStmt->fetchColumn();
                     if ($defId === false) {
+                        $defId = $this->ensureFallbackDefinition($goalId, $prefKey);
+                    }
+                    if ($defId === false) {
                         continue;
                     }
                     $insert->execute([
@@ -332,6 +335,41 @@ final class OnboardingRepository
             }
             throw $e;
         }
+    }
+
+    private function ensureFallbackDefinition(int $goalId, string $prefKey): int|false
+    {
+        $slug = $this->goalSlugById($goalId);
+        if ($slug === '') {
+            return false;
+        }
+        $fallbackDefs = (new GoalQuestionCatalogService())->fallbackDefinitionsForGoalSlug($slug, $goalId);
+        foreach ($fallbackDefs as $def) {
+            if ((string)($def['pref_key'] ?? '') !== $prefKey) {
+                continue;
+            }
+            $allowedJson = json_encode((array)($def['allowed_values'] ?? []), JSON_UNESCAPED_UNICODE);
+            $insert = $this->pdo->prepare(
+                'INSERT INTO goal_preference_definitions (goal_id, pref_key, label_key, helper_text_key, input_type, value_type, allowed_values_json, is_required, is_active, weight, created_at, updated_at)
+                 VALUES (:goal_id, :pref_key, :label_key, :helper_text_key, :input_type, :value_type, :allowed_values_json, :is_required, 1, :weight, :created_at, :updated_at)'
+            );
+            $now = date('Y-m-d H:i:s');
+            $insert->execute([
+                'goal_id' => $goalId,
+                'pref_key' => $prefKey,
+                'label_key' => (string)($def['label_key'] ?? ('onboarding.goal_pref.' . $prefKey)),
+                'helper_text_key' => (string)($def['helper_text_key'] ?? ''),
+                'input_type' => (string)($def['input_type'] ?? 'select'),
+                'value_type' => (string)($def['value_type'] ?? 'string'),
+                'allowed_values_json' => $allowedJson ?: '[]',
+                'is_required' => (int)($def['is_required'] ?? 0),
+                'weight' => (int)($def['weight'] ?? 0),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            return (int)$this->pdo->lastInsertId();
+        }
+        return false;
     }
 
     public function getGoalPreferenceValuesForUser(int $userId): array
