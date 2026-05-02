@@ -408,7 +408,14 @@ final class OnboardingRepository
         }
 
         $primaryGoalId = (int)$goalIds[0];
+        $catalog = new GoalQuestionCatalogService();
+        $primarySlug = $this->goalSlugById($primaryGoalId);
+        $orderedKeys = $catalog->orderedKeysForPrimaryGoalSlug($primarySlug);
         $defs = $this->goalPreferenceDefinitions([$primaryGoalId]);
+        if ($orderedKeys !== []) {
+            $allowedKeyMap = array_fill_keys($orderedKeys, true);
+            $defs = array_values(array_filter($defs, static fn(array $d): bool => isset($allowedKeyMap[(string)($d['pref_key'] ?? '')])));
+        }
         $requiredDefs = array_values(array_filter($defs, static fn(array $d): bool => (int)($d['is_required'] ?? 0) === 1));
         if ($requiredDefs === []) {
             return true;
@@ -427,6 +434,9 @@ final class OnboardingRepository
             }
             $value = trim((string)$raw);
             if ($value === '') {
+                return false;
+            }
+            if ($catalog->isSensitiveGoalSlug($primarySlug) && $catalog->isStrictSensitiveKey($prefKey) && in_array(strtolower($value), ['not_sure', 'unsure'], true)) {
                 return false;
             }
         }
