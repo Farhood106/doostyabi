@@ -30,20 +30,14 @@ final class HardFilterService
         if ($goalOverlap === []) {
             $reasons[] = 'goal_mismatch';
         }
-        if ($this->hasSensitiveGoalUncertainty($source, $candidate, $goalOverlap)) {
-            $reasons[] = 'sensitive_goal_uncertain_consent_or_privacy';
-        }
-
         if (!$this->ageCompatible($source, $candidate)) {
             $reasons[] = 'age_preference_mismatch';
         }
-
-        // Privacy-safe hard gate: country must match.
-        // Region/cell are intentionally *not* hard filters so cold-start users
-        // are not over-rejected; those fields are handled in candidate staging
-        // and distance scoring.
-        if (($source['country_code'] ?? '') !== ($candidate['country_code'] ?? '')) {
-            $reasons[] = 'country_mismatch';
+        if (!$this->genderCompatible($source, $candidate)) {
+            $reasons[] = 'gender_interest_mismatch';
+        }
+        if (!$this->locationScopeCompatible($source, $candidate)) {
+            $reasons[] = 'strict_location_scope_mismatch';
         }
 
         if ($this->hasBoundaryConflict($source['boundaries'], $candidate['boundaries'])) {
@@ -62,25 +56,29 @@ final class HardFilterService
         ];
     }
 
-    private function hasSensitiveGoalUncertainty(array $source, array $candidate, array $goalOverlap): bool
+    private function genderCompatible(array $source, array $candidate): bool
     {
-        $sensitiveGoalIds = [10, 11];
-        $targets = array_intersect(array_map('intval', $goalOverlap), $sensitiveGoalIds);
-        if ($targets === []) {
-            return false;
-        }
+        $aInterest = trim((string)($source['interested_in_gender'] ?? ''));
+        $bInterest = trim((string)($candidate['interested_in_gender'] ?? ''));
+        $aGender = trim((string)($source['gender_identity'] ?? ''));
+        $bGender = trim((string)($candidate['gender_identity'] ?? ''));
+        $aOk = ($aInterest === '' || $aInterest === $bGender);
+        $bOk = ($bInterest === '' || $bInterest === $aGender);
+        return $aOk && $bOk;
+    }
 
-        $strictKeys = ['must.consent_style', 'must.boundary_respect', 'must.transparency_level', 'must.safety_boundaries', 'privacy.discretion_level'];
-        foreach ($targets as $goalId) {
-            foreach ($strictKeys as $k) {
-                $a = strtolower(trim((string)($source['goal_preferences'][(int)$goalId][$k] ?? '')));
-                $b = strtolower(trim((string)($candidate['goal_preferences'][(int)$goalId][$k] ?? '')));
-                if (in_array($a, ['not_sure', 'unsure', ''], true) || in_array($b, ['not_sure', 'unsure', ''], true)) {
-                    return true;
-                }
-            }
+    private function locationScopeCompatible(array $source, array $candidate): bool
+    {
+        $primaryGoal = (int)($source['goals'][0] ?? 0);
+        $prefs = (array)($source['goal_preferences'][$primaryGoal] ?? []);
+        $scope = (string)($prefs['seek.location_scope'] ?? '');
+        if ($scope === 'city_only') {
+            return (string)($source['location_cell_l5'] ?? '') !== '' && (($source['location_cell_l5'] ?? '') === ($candidate['location_cell_l5'] ?? ''));
         }
-        return false;
+        if ($scope === 'same_province') {
+            return (string)($source['region_code'] ?? '') !== '' && (($source['region_code'] ?? '') === ($candidate['region_code'] ?? ''));
+        }
+        return true;
     }
 
     private function ageCompatible(array $a, array $b): bool

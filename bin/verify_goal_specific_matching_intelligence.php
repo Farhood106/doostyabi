@@ -67,7 +67,7 @@ $mismatchB['goal_preferences'][10] = [
 $mismatch = $service->score($baseA, $mismatchB, [10]);
 giAssert(((float)$mismatch['score_breakdown']['need_offer_fit']) < ((float)$aligned['score_breakdown']['need_offer_fit']), 'mismatch should reduce need_offer_fit');
 giAssert(count((array)$mismatch['score_breakdown']['preference_gaps']) >= 1, 'mismatch should expose preference gaps');
-giAssert(isset($mismatch['score_breakdown']['primary_goal_fit']), 'phase C score breakdown should include primary_goal_fit');
-giAssert(isset($mismatch['score_breakdown']['availability_distance_fit']), 'phase C score breakdown should include availability_distance_fit');
+giAssert(isset($mismatch['score_breakdown']['goal_fit']), 'score breakdown should include goal_fit');
+giAssert(isset($mismatch['score_breakdown']['location_fit']), 'score breakdown should include location_fit');
 
 echo "OK: goal-specific matching intelligence verification passed\n";

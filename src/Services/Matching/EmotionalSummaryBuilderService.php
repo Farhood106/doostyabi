@@ -8,7 +8,7 @@ final class EmotionalSummaryBuilderService
 {
     public function buildKey(array $scoreBreakdown, array $viewer, array $candidate): string
     {
-        $schedule = (float)($scoreBreakdown['schedule_overlap'] ?? 0);
+        $schedule = (float)($scoreBreakdown['availability_fit'] ?? ($scoreBreakdown['schedule_overlap'] ?? 0));
         $distance = (float)($scoreBreakdown['distance_fit'] ?? 0);
         $dimensions = (float)($scoreBreakdown['dimensions'] ?? 0);
 

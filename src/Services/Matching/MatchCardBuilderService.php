@@ -64,7 +64,8 @@ final class MatchCardBuilderService
                 'expectation_alignment_key' => 'match.intro.expectation_alignment',
                 'first_conversation_key' => 'match.intro.discuss_first',
                 'communication_boundaries_json' => $this->safeCommunicationBoundaries((array)$candidate['boundaries']),
-                'schedule_overlap_key' => $this->scheduleOverlapKey((float)($scoreBreakdown['availability_distance_fit'] ?? 0)),
+                'purpose_summary_key' => 'match.purpose.summary',
+                'schedule_overlap_key' => $this->scheduleOverlapKey((float)($scoreBreakdown['availability_fit'] ?? 0)),
                 'card_version' => $this->cardVersion,
             ];
 

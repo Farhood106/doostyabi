@@ -231,6 +231,18 @@ WHERE (CASE WHEN m_old.user_a_id = mc_old.viewer_user_id THEN m_old.user_b_id EL
   - pace/duration alignment,
   - caution on expectation gaps.
 
+## Matching model correction (purpose-first)
+
+- Hard filters are now intentionally minimal: self, inactive user, blocked pair, no shared goal, age mismatch, gender-interest mismatch, strict location-scope mismatch (when chosen), and serious boundary conflict.
+- Missing optional goal answers are not hard reject; they reduce confidence and can add caution.
+- Location scope is user-controlled via goal preference key `seek.location_scope`:
+  - `city_only`, `same_province`, `neighboring_provinces`, `all_iran`, `distance_not_important`.
+- Scoring breakdown is purpose-first and includes:
+  - `goal_fit`, `desired_person_fit`, `need_offer_fit`, `expectation_fit`,
+  - `location_fit`, `availability_fit`, `boundary_safety_fit`,
+  - `profile_context_fit`, `confidence_score`, `penalties`.
+- Boundaries are primarily display/safety guidance on cards; only explicit strong conflicts are hard-rejected.
+
 ## Goal-specific question step (phase 2)
 
 - Onboarding flow is now:
