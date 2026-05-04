@@ -17,7 +17,7 @@ function giAssert(bool $ok, string $msg): void
 
 $catalog = new GoalQuestionCatalogService();
 $casualKeys = $catalog->allowedPreferenceKeysForGoalSlug('casual_connection');
-giAssert(in_array('privacy.discretion_level', $casualKeys, true), 'casual catalog should include privacy discretion');
+giAssert(in_array('must.discretion_required', $casualKeys, true), 'casual catalog should include discretion requirement');
 giAssert(in_array('must.consent_style', $casualKeys, true), 'casual catalog should include consent style');
 
 $service = new CompatibilityScoringService();

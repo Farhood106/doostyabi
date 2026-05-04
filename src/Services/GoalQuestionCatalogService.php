@@ -9,7 +9,12 @@ final class GoalQuestionCatalogService
     /** @var string[] */
     private const SHARED_BASELINE_KEYS = [
         'must.boundary_respect',
-        'privacy.discretion_level',
+        'must.discretion_required',
+        'seek.age_min',
+        'seek.age_max',
+        'seek.gender',
+        'seek.relationship_status',
+        'seek.location_scope',
         'pace.response_cadence',
         'involvement.time_intensity',
     ];
@@ -85,6 +90,10 @@ final class GoalQuestionCatalogService
         ],
         'casual_connection' => [
             'seek.connection_expectation',
+            'seek.body_type',
+            'seek.height_preference',
+            'seek.hair_preference',
+            'seek.physical_attraction_importance',
             'accept.emotional_involvement_level',
             'pace.intimacy_pace',
             'must.consent_style',
@@ -99,6 +108,7 @@ final class GoalQuestionCatalogService
         ],
         // optional new slug compatibility
         'support_based_relationship' => [
+            'seek.connection_expectation',
             'seek.support_role',
             'seek.support_type',
             'offer.support_role',
@@ -159,7 +169,10 @@ final class GoalQuestionCatalogService
                 $this->def($goalId, 'accept.communication_style', 'onboarding.goal_pref.accept_communication_style.label', null, 'multiselect', ['text_short', 'voice', 'scheduled_calls', 'infrequent_ok'], 0),
             ],
             'long_term_relationship' => [
+                $this->def($goalId, 'seek.connection_expectation', 'onboarding.goal_pref.seek_connection_expectation.label', null, 'select', ['serious_relationship', 'marriage_intent'], 1),
                 $this->def($goalId, 'must.commitment_intent', 'onboarding.goal_pref.must_commitment_intent.label', null, 'select', ['explicit_long_term', 'long_term_preferred', 'open_but_unsure'], 1),
+                $this->def($goalId, 'seek.relationship_status', 'onboarding.goal_pref.seek_relationship_status.label', null, 'select', ['single', 'separated', 'does_not_matter'], 0),
+                $this->def($goalId, 'seek.body_type', 'onboarding.goal_pref.seek_body_type.label', null, 'select', ['slim','average','athletic','does_not_matter'], 0),
                 $this->def($goalId, 'seek.stability_level', 'onboarding.goal_pref.seek_stability_level.label', null, 'select', ['steady', 'highly_structured', 'flexible_but_reliable'], 1),
                 $this->def($goalId, 'offer.consistency_level', 'onboarding.goal_pref.offer_consistency_level.label', null, 'select', ['weekly_reliable', 'high_reliability', 'moderate_reliability'], 1),
                 $this->def($goalId, 'pace.commitment_pace', 'onboarding.goal_pref.pace_commitment_pace.label', null, 'select', ['slow_intentional', 'moderate', 'fast_if_aligned'], 1),
@@ -184,6 +197,10 @@ final class GoalQuestionCatalogService
             ],
             'casual_connection' => [
                 $this->def($goalId, 'seek.connection_expectation', 'onboarding.goal_pref.seek_connection_expectation.label', null, 'select', ['light_chat', 'companionship', 'low_commitment_romantic'], 1),
+                $this->def($goalId, 'seek.body_type', 'onboarding.goal_pref.seek_body_type.label', null, 'select', ['slim','average','curvy','plus_size','athletic','does_not_matter'], 0),
+                $this->def($goalId, 'seek.height_preference', 'onboarding.goal_pref.seek_height_preference.label', null, 'select', ['shorter','average','tall','does_not_matter'], 0),
+                $this->def($goalId, 'seek.hair_preference', 'onboarding.goal_pref.seek_hair_preference.label', null, 'select', ['dark','light','red','does_not_matter'], 0),
+                $this->def($goalId, 'seek.physical_attraction_importance', 'onboarding.goal_pref.seek_physical_attraction_importance.label', null, 'select', ['important','somewhat','not_important'], 0),
                 $this->def($goalId, 'accept.emotional_involvement_level', 'onboarding.goal_pref.accept_emotional_involvement_level.label', null, 'select', ['low', 'moderate'], 1),
                 $this->def($goalId, 'pace.intimacy_pace', 'onboarding.goal_pref.pace_intimacy_pace.label', null, 'select', ['very_slow', 'slow', 'mutually_set'], 1),
                 $this->def($goalId, 'must.consent_style', 'onboarding.goal_pref.must_consent_style.label', null, 'select', ['affirmative_and_ongoing', 'not_sure'], 1),
@@ -191,6 +208,7 @@ final class GoalQuestionCatalogService
                 $this->def($goalId, 'accept.appearance_preference_optional_general', 'onboarding.goal_pref.accept_appearance_preference_optional_general.label', null, 'text', [], 0),
             ],
             'support_based_relationship' => [
+                $this->def($goalId, 'seek.connection_expectation', 'onboarding.goal_pref.seek_connection_expectation.label', null, 'select', ['supportive_clear','respectful_non_committed'], 1),
                 $this->def($goalId, 'seek.support_role', 'onboarding.goal_pref.seek_support_role.label', null, 'select', ['seek_support', 'flexible'], 1),
                 $this->def($goalId, 'seek.support_type', 'onboarding.goal_pref.seek_support_type.label', null, 'multiselect', ['mentorship', 'practical_help', 'lifestyle_support'], 1),
                 $this->def($goalId, 'offer.support_role', 'onboarding.goal_pref.offer_support_role.label', null, 'select', ['offer_support', 'flexible'], 1),
